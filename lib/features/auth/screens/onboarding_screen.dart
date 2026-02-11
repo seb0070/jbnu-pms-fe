@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'login_screen.dart';
+import 'register_screen.dart';
 
 class OnboardingScreen extends StatelessWidget {
   const OnboardingScreen({super.key});
@@ -15,7 +17,7 @@ class OnboardingScreen extends StatelessWidget {
             fit: BoxFit.cover,
           ),
 
-          // 내용물
+          // 내용 요소들
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -58,7 +60,7 @@ class OnboardingScreen extends StatelessWidget {
 
                   Spacer(flex: 3),
 
-                  // Sign In 버튼
+                  // 로그인 버튼
                   Container(
                     height: 56,
                     decoration: BoxDecoration(
@@ -77,7 +79,12 @@ class OnboardingScreen extends StatelessWidget {
                       color: Colors.transparent,
                       child: InkWell(
                         onTap: () {
-                          // TODO: 로그인 화면으로 이동
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const LoginScreen(),
+                            ),
+                          );
                         },
                         borderRadius: BorderRadius.circular(28),
                         child: Center(
@@ -95,7 +102,7 @@ class OnboardingScreen extends StatelessWidget {
                   ),
                   SizedBox(height: 16),
 
-                  // Sign Up 버튼 (투명 배경)
+                  // 회원가입 버튼 (투명 배경)
                   Container(
                     height: 56,
                     decoration: BoxDecoration(
@@ -106,7 +113,12 @@ class OnboardingScreen extends StatelessWidget {
                       color: Colors.transparent,
                       child: InkWell(
                         onTap: () {
-                          // TODO: 회원가입 화면으로 이동
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const RegisterScreen(),
+                            ),
+                          );
                         },
                         borderRadius: BorderRadius.circular(28),
                         child: Center(

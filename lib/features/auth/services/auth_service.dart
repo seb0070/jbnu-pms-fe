@@ -1,70 +1,281 @@
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:logger/logger.dart';
 
 class AuthService {
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
-  final Dio _dio = Dio();
+  final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
+  final Logger _logger = Logger(
+    printer: PrettyPrinter(
+      methodCount: 0,
+      errorMethodCount: 5,
+      lineLength: 50,
+      colors: true,
+      printEmojis: true,
+      printTime: true,
+    ),
+  );
 
-  // API 베이스 URL (나중에 백엔드 URL로 변경)
-  static const String baseUrl = 'http://your-backend-api.com';
+  final Dio _dio = Dio(
+    BaseOptions(
+      baseUrl: 'http://10.0.2.2:8080',
+      headers: {'Content-Type': 'application/json'},
+    ),
+  );
 
-  // 구글 로그인
-  Future<bool> signInWithGoogle() async {
+  static const String authBaseUrl = '/auth';
+
+  // 이메일 중복 확인
+  Future<Map<String, dynamic>> checkEmailAvailable(String email) async {
     try {
-      // 1. 구글 로그인 팝업
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      final response = await _dio.get(
+        '$authBaseUrl/check-email',
+        queryParameters: {'email': email},
+      );
+      return {
+        'success': response.data['isSuccess'] ?? false,
+        'data': response.data['data'],
+      };
+    } on DioException catch (e) {
+      _logger.e('이메일 확인 에러', error: e.response?.data);
+      return {
+        'success': false,
+        'message': e.response?.data?['message'] ?? '이메일 확인 실패',
+      };
+    }
+  }
 
-      if (googleUser == null) {
-        // 사용자가 취소함
-        return false;
-      }
-
-      // 2. 구글 인증 정보 가져오기
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-      final String? idToken = googleAuth.idToken;
-
-      if (idToken == null) {
-        return false;
-      }
-
-      // 3. 백엔드 API로 토큰 전송
+  // 인증 코드 발송
+  Future<Map<String, dynamic>> sendVerificationCode({
+    required String email,
+    required String type,
+  }) async {
+    try {
       final response = await _dio.post(
-        '$baseUrl/auth/social-login',
+        '$authBaseUrl/verification/send',
+        data: {'email': email, 'type': type},
+      );
+      return {
+        'success': response.data['isSuccess'] ?? false,
+        'data': response.data['data'],
+      };
+    } on DioException catch (e) {
+      _logger.e('인증 코드 발송 에러', error: e.response?.data);
+      return {
+        'success': false,
+        'message': e.response?.data?['message'] ?? '인증 코드 발송 실패',
+      };
+    }
+  }
+
+  // 인증 코드 확인
+  Future<Map<String, dynamic>> verifyCode({
+    required String email,
+    required String code,
+    required String type,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '$authBaseUrl/verification/verify',
+        data: {'email': email, 'code': code, 'type': type},
+      );
+      return {
+        'success': response.data['isSuccess'] ?? false,
+        'data': response.data['data'],
+      };
+    } on DioException catch (e) {
+      _logger.e('인증 코드 확인 에러', error: e.response?.data);
+      return {
+        'success': false,
+        'message': e.response?.data?['message'] ?? '인증 실패',
+      };
+    }
+  }
+
+  // 회원가입
+  Future<Map<String, dynamic>> register({
+    required String name,
+    required String email,
+    required String password,
+    required String verificationCode,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '$authBaseUrl/register',
         data: {
-          'provider': 'google',
-          'token': idToken,
-          'email': googleUser.email,
-          'name': googleUser.displayName,
+          'email': email,
+          'password': password,
+          'name': name,
+          'verificationCode': verificationCode,
         },
       );
+      _logger.i('회원가입 성공');
+      return {
+        'success': response.data['isSuccess'] ?? false,
+        'data': response.data['data'],
+        'message': '회원가입 성공',
+      };
+    } on DioException catch (e) {
+      _logger.e('회원가입 에러', error: e.response?.data);
+      return {
+        'success': false,
+        'message': e.response?.data?['message'] ?? '회원가입 실패',
+      };
+    }
+  }
 
-      // 4. JWT 토큰 저장
-      if (response.statusCode == 200) {
-        final String jwtToken = response.data['accessToken'];
+  // 일반 로그인
+  Future<Map<String, dynamic>> login({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      _logger.d('로그인 시도: $email');
+
+      final response = await _dio.post(
+        '$authBaseUrl/login',
+        data: {'email': email, 'password': password},
+      );
+
+      if (response.data['isSuccess'] == true && response.data['data'] != null) {
+        final data = response.data['data'];
+
+        if (data['accessToken'] == null) {
+          return {'success': false, 'message': 'accessToken이 없습니다'};
+        }
+
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('jwt_token', jwtToken);
-        return true;
+        await prefs.setString('access_token', data['accessToken']);
+
+        if (data['refreshToken'] != null) {
+          await prefs.setString('refresh_token', data['refreshToken']);
+        }
+
+        _logger.i('로그인 성공');
+        return {'success': true, 'message': '로그인 성공'};
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? '로그인 실패',
+        };
+      }
+    } on DioException catch (e) {
+      _logger.e('로그인 실패', error: e.response?.data);
+
+      String errorMessage = '로그인 실패';
+
+      if (e.response?.data != null) {
+        if (e.response!.data is Map) {
+          errorMessage = e.response!.data['message'] ?? errorMessage;
+        }
       }
 
-      return false;
+      return {'success': false, 'message': errorMessage};
     } catch (e) {
-      print('구글 로그인 에러: $e');
-      return false;
+      _logger.e('로그인 예외', error: e);
+      return {'success': false, 'message': '로그인 중 오류 발생'};
+    }
+  }
+
+  // 구글 로그인
+  Future<Map<String, dynamic>> signInWithGoogle() async {
+    try {
+      _logger.d('구글 로그인 시작');
+
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        _logger.w('구글 로그인 취소됨');
+        return {'success': false, 'message': '로그인이 취소되었습니다'};
+      }
+
+      _logger.d('구글 사용자 정보 획득: ${googleUser.email}');
+
+      final googleAuth = await googleUser.authentication;
+      final accessToken = googleAuth.accessToken;
+
+      if (accessToken == null) {
+        _logger.e('accessToken이 null');
+        return {'success': false, 'message': '구글 인증 실패'};
+      }
+
+      final response = await _dio.post(
+        '$authBaseUrl/oauth2/login',
+        data: {'provider': 'GOOGLE', 'accessToken': accessToken},
+      );
+
+      if (response.data['isSuccess'] == true && response.data['data'] != null) {
+        final data = response.data['data'];
+
+        if (data['accessToken'] == null) {
+          return {'success': false, 'message': 'accessToken이 없습니다'};
+        }
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('access_token', data['accessToken']);
+
+        if (data['refreshToken'] != null) {
+          await prefs.setString('refresh_token', data['refreshToken']);
+        }
+
+        _logger.i('구글 로그인 성공');
+        return {'success': true, 'message': '로그인 성공'};
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? '구글 로그인 실패',
+        };
+      }
+    } on DioException catch (e) {
+      _logger.e('구글 로그인 실패', error: e.response?.data);
+
+      String errorMessage = '구글 로그인 실패';
+
+      if (e.response?.data != null) {
+        if (e.response!.data is Map) {
+          errorMessage = e.response!.data['message'] ?? errorMessage;
+        }
+      }
+
+      return {'success': false, 'message': errorMessage};
+    } catch (e) {
+      _logger.e('구글 로그인 예외', error: e);
+      return {'success': false, 'message': '구글 로그인 중 오류 발생'};
     }
   }
 
   // 로그아웃
   Future<void> signOut() async {
-    await _googleSignIn.signOut();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('jwt_token');
+    try {
+      await _googleSignIn.signOut();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+      _logger.i('로그아웃 완료');
+    } catch (e) {
+      _logger.e('로그아웃 에러', error: e);
+    }
   }
 
   // 로그인 상태 확인
   Future<bool> isLoggedIn() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.containsKey('jwt_token');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final hasToken = prefs.containsKey('access_token');
+      _logger.d('로그인 상태: $hasToken');
+      return hasToken;
+    } catch (e) {
+      _logger.e('로그인 상태 확인 에러', error: e);
+      return false;
+    }
+  }
+
+  // 저장된 토큰 가져오기
+  Future<String?> getAccessToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('access_token');
+    } catch (e) {
+      _logger.e('토큰 가져오기 에러', error: e);
+      return null;
+    }
   }
 }
