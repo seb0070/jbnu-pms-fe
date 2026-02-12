@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'register_screen.dart';
 import 'reset_password_screen.dart';
+import '../../main/main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -42,7 +43,11 @@ class _LoginScreenState extends State<LoginScreen> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(result['message'] ?? '로그인 성공')));
-        // TODO: 홈 화면 이동
+        Navigator.pushReplacement(
+          context,
+
+          MaterialPageRoute(builder: (context) => const MainScreen()),
+        );
       } else if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -63,7 +68,11 @@ class _LoginScreenState extends State<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(result['message'] ?? '구글 로그인 성공')),
         );
-        // TODO: 홈 화면 이동
+        Navigator.pushReplacement(
+          context,
+
+          MaterialPageRoute(builder: (context) => const MainScreen()),
+        );
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(result['message'] ?? '구글 로그인 실패')),
