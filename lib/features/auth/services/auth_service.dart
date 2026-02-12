@@ -255,6 +255,44 @@ class AuthService {
     }
   }
 
+  // 비밀번호 재설정
+  Future<Map<String, dynamic>> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    try {
+      _logger.d('비밀번호 재설정 시도: $email');
+
+      final response = await _dio.post(
+        '$authBaseUrl/password/reset',
+        data: {'email': email, 'code': code, 'newPassword': newPassword},
+      );
+
+      _logger.i('비밀번호 재설정 성공');
+
+      return {
+        'success': response.data['isSuccess'] ?? false,
+        'message': '비밀번호가 재설정되었습니다',
+      };
+    } on DioException catch (e) {
+      _logger.e('비밀번호 재설정 실패', error: e.response?.data);
+
+      String errorMessage = '비밀번호 재설정 실패';
+
+      if (e.response?.data != null) {
+        if (e.response!.data is Map) {
+          errorMessage = e.response!.data['message'] ?? errorMessage;
+        }
+      }
+
+      return {'success': false, 'message': errorMessage};
+    } catch (e) {
+      _logger.e('비밀번호 재설정 예외', error: e);
+      return {'success': false, 'message': '비밀번호 재설정 중 오류 발생'};
+    }
+  }
+
   // 로그인 상태 확인
   Future<bool> isLoggedIn() async {
     try {
