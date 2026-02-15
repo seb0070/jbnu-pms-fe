@@ -80,14 +80,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() {
       _isCheckingEmail = false;
       _isEmailChecked = true;
-      _isEmailAvailable = result['available'] ?? false;
+      _isEmailAvailable = result['data']?['available'] ?? false; // ← 수정!
     });
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result['message'] ?? '확인 완료'),
-          backgroundColor: (result['available'] ?? false)
+          content: Text(result['data']?['message'] ?? '확인 완료'), // ← 이것도 수정!
+          backgroundColor:
+              (result['data']?['available'] ?? false) // ← 이것도 수정!
               ? Colors.green
               : Colors.red,
         ),

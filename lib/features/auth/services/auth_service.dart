@@ -18,7 +18,8 @@ class AuthService {
 
   final Dio _dio = Dio(
     BaseOptions(
-      baseUrl: 'http://10.0.2.2:8080',
+      baseUrl: 'http://10.0.2.2:8080', // Android 에뮬레이터용 로컬호스트
+      // baseUrl: 'http://192.168.0.1:8080', // 실제 기기 테스트용 로컬 IP
       headers: {'Content-Type': 'application/json'},
     ),
   );
@@ -28,20 +29,32 @@ class AuthService {
   // 이메일 중복 확인
   Future<Map<String, dynamic>> checkEmailAvailable(String email) async {
     try {
+      _logger.d('이메일 중복 확인 시작: $email'); // <- 추가!
+
       final response = await _dio.get(
         '$authBaseUrl/check-email',
         queryParameters: {'email': email},
       );
+
+      _logger.d('이메일 확인 응답: ${response.data}'); // <- 추가!
+
       return {
         'success': response.data['isSuccess'] ?? false,
         'data': response.data['data'],
       };
     } on DioException catch (e) {
-      _logger.e('이메일 확인 에러', error: e.response?.data);
+      _logger.e('이메일 확인 DioException'); // <- 추가!
+      _logger.e('상태코드: ${e.response?.statusCode}'); // <- 추가!
+      _logger.e('응답 데이터: ${e.response?.data}');
+
       return {
         'success': false,
         'message': e.response?.data?['message'] ?? '이메일 확인 실패',
       };
+    } catch (e) {
+      // <- 추가!
+      _logger.e('이메일 확인 예외: $e');
+      return {'success': false, 'message': '이메일 확인 중 오류 발생'};
     }
   }
 
@@ -198,10 +211,17 @@ class AuthService {
         return {'success': false, 'message': '구글 인증 실패'};
       }
 
+      _logger.d('백엔드 호출 준비');
+      _logger.d('URL: ${_dio.options.baseUrl}$authBaseUrl/oauth2/login');
+      _logger.d('accessToken 길이: ${accessToken.length}');
+
       final response = await _dio.post(
         '$authBaseUrl/oauth2/login',
         data: {'provider': 'GOOGLE', 'accessToken': accessToken},
       );
+
+      _logger.d('백엔드 응답 받음: ${response.statusCode}');
+      _logger.d('응답 데이터: ${response.data}');
 
       if (response.data['isSuccess'] == true && response.data['data'] != null) {
         final data = response.data['data'];
@@ -227,6 +247,12 @@ class AuthService {
       }
     } on DioException catch (e) {
       _logger.e('구글 로그인 실패', error: e.response?.data);
+      _logger.e('DioException 발생!');
+      _logger.e('타입: ${e.type}');
+      _logger.e('메시지: ${e.message}');
+      _logger.e('URL: ${e.requestOptions.uri}');
+      _logger.e('상태코드: ${e.response?.statusCode}');
+      _logger.e('응답: ${e.response?.data}');
 
       String errorMessage = '구글 로그인 실패';
 
