@@ -21,6 +21,9 @@ class AuthService {
       baseUrl: 'http://10.0.2.2:8080', // Android 에뮬레이터용 로컬호스트
       // baseUrl: 'http://192.168.0.1:8080', // 실제 기기 테스트용 로컬 IP
       headers: {'Content-Type': 'application/json'},
+      connectTimeout: Duration(seconds: 10),
+      receiveTimeout: Duration(seconds: 10),
+      sendTimeout: Duration(seconds: 10),
     ),
   );
 
