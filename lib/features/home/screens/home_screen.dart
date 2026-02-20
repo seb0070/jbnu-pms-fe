@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../space/services/space_service.dart';
-// import '../../space/screens/space_list_screen.dart';
+import '../../space/screens/space_list_screen.dart';
 import '../../space/screens/space_create_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -68,14 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
-          // 드롭다운 오버레이
-          if (_dropdownOpen)
-            Positioned(
-              top: MediaQuery.of(context).padding.top + 48,
-              left: 0,
-              right: 0,
-              child: _buildDropdown(),
-            ),
+
           // 드롭다운 닫기용 배경 터치
           if (_dropdownOpen)
             Positioned.fill(
@@ -84,6 +77,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 onTap: () => setState(() => _dropdownOpen = false),
                 behavior: HitTestBehavior.translucent,
               ),
+            ),
+
+          // 드롭다운 오버레이
+          if (_dropdownOpen)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 48,
+              left: 0,
+              right: 0,
+              child: _buildDropdown(),
             ),
         ],
       ),
@@ -153,11 +155,10 @@ class _HomeScreenState extends State<HomeScreen> {
             InkWell(
               onTap: () {
                 setState(() => _dropdownOpen = false);
-                // TODO: SpaceListScreen 구현 후 주석 해제
-                // Navigator.push(
-                //   context,
-                //   MaterialPageRoute(builder: (_) => const SpaceListScreen()),
-                // ).then((_) => _loadSpaces());
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SpaceListScreen()),
+                ).then((_) => _loadSpaces());
               },
               child: Padding(
                 padding: const EdgeInsets.symmetric(
