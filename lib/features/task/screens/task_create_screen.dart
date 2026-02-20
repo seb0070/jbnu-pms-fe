@@ -24,6 +24,7 @@ class _TaskCreateScreenState extends State<TaskCreateScreen> {
   final _descController = TextEditingController();
   String _priority = 'MEDIUM';
   DateTime? _dueDate;
+  final List<Map<String, dynamic>> _assignees = [];
   bool _isLoading = false;
 
   static const _purple = Color(0xFF6C5CE7);
@@ -322,6 +323,83 @@ class _TaskCreateScreenState extends State<TaskCreateScreen> {
                                         ],
                                       ),
                                     ),
+                                  ),
+                                  const SizedBox(height: 20),
+
+                                  // 담당자
+                                  _buildLabel('담당자'),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      // 선택된 담당자 아바타
+                                      ...List.generate(_assignees.length, (
+                                        index,
+                                      ) {
+                                        final a = _assignees[index];
+                                        return Padding(
+                                          padding: const EdgeInsets.only(
+                                            right: 8,
+                                          ),
+                                          child: Stack(
+                                            clipBehavior: Clip.none,
+                                            children: [
+                                              CircleAvatar(
+                                                radius: 20,
+                                                backgroundColor: _purple
+                                                    .withOpacity(0.15),
+                                                child: Text(
+                                                  (a['name'] as String)[0]
+                                                      .toUpperCase(),
+                                                  style: const TextStyle(
+                                                    color: _purple,
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
+                                              ),
+                                              Positioned(
+                                                top: -2,
+                                                right: -2,
+                                                child: GestureDetector(
+                                                  onTap: () => setState(
+                                                    () => _assignees.removeAt(
+                                                      index,
+                                                    ),
+                                                  ),
+                                                  child: Container(
+                                                    width: 16,
+                                                    height: 16,
+                                                    decoration:
+                                                        const BoxDecoration(
+                                                          color: Colors.grey,
+                                                          shape:
+                                                              BoxShape.circle,
+                                                        ),
+                                                    child: const Icon(
+                                                      Icons.close,
+                                                      color: Colors.white,
+                                                      size: 10,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }),
+                                      // 담당자 추가 버튼
+                                      GestureDetector(
+                                        onTap: () {
+                                          // TODO: 멤버 목록 모달 연결
+                                        },
+                                        child: Image.asset(
+                                          'lib/assets/images/ProfileCircle.png', // 원하는 PNG 경로
+                                          width: 40,
+                                          height: 40,
+                                          color: Colors.grey[400],
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                   const SizedBox(height: 24),
                                 ],
