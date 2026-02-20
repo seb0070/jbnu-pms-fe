@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../space/services/space_service.dart';
 // import '../../space/screens/space_list_screen.dart';
-// import '../../space/screens/space_create_screen.dart';
+import '../../space/screens/space_create_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -225,11 +225,10 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             GestureDetector(
               onTap: () {
-                // TODO: SpaceCreateScreen 연결
-                // Navigator.push(
-                //   context,
-                //   MaterialPageRoute(builder: (_) => const SpaceCreateScreen()),
-                // ).then((_) => _loadSpaces());
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SpaceCreateScreen()),
+                ).then((_) => _loadSpaces());
               },
               child: Container(
                 width: 80,
