@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/space_service.dart';
-// import 'space_detail_screen.dart';
+import 'space_detail_screen.dart';
 
 class SpaceListScreen extends StatefulWidget {
   const SpaceListScreen({super.key});
@@ -152,12 +152,12 @@ class _SpaceListScreenState extends State<SpaceListScreen> {
   Widget _buildSpaceCard(Map<String, dynamic> space) {
     return GestureDetector(
       onTap: () {
-        // Navigator.push(
-        //   context,
-        //   MaterialPageRoute(
-        //     builder: (_) => SpaceDetailScreen(spaceId: space['id']),
-        //   ),
-        // ).then((_) => _loadSpaces());
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SpaceDetailScreen(spaceId: space['id']),
+          ),
+        ).then((_) => _loadSpaces());
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
