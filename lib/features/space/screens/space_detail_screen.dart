@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/space_service.dart';
+import '../../project/services/project_service.dart';
+import '../../project/screens/project_list_screen.dart';
+import '../../project/screens/project_create_screen.dart';
+import '../../project/screens/project_detail_screen.dart';
 
 class SpaceDetailScreen extends StatefulWidget {
   final int spaceId;
@@ -12,7 +16,9 @@ class SpaceDetailScreen extends StatefulWidget {
 
 class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
   final SpaceService _spaceService = SpaceService();
+  final ProjectService _projectService = ProjectService();
   Map<String, dynamic>? _space;
+  List<Map<String, dynamic>> _projects = [];
   bool _isLoading = true;
   int? _currentUserId;
 
@@ -34,8 +40,10 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
       final prefs = await SharedPreferences.getInstance();
       _currentUserId = prefs.getInt('user_id');
       final space = await _spaceService.getSpace(widget.spaceId);
+      final projects = await _projectService.getProjects(widget.spaceId);
       setState(() {
         _space = space;
+        _projects = projects;
         _isLoading = false;
       });
     } catch (e) {
@@ -566,7 +574,6 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
                     final isMe = member['userId'] == _currentUserId;
                     final isOwnerMember = member['userId'] == ownerId;
                     final role = member['role'] as String? ?? 'MEMBER';
-
                     return ListTile(
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 20,
@@ -714,7 +721,6 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
   }
 
   Widget _buildMemberGrid(List<Map<String, dynamic>> members, dynamic ownerId) {
-    // 관리자(소유자)와 일반 멤버 분리
     final owner = members.where((m) => m['userId'] == ownerId).toList();
     final normalMembers = members
         .where((m) => m['userId'] != ownerId)
@@ -723,7 +729,6 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
 
     return Column(
       children: [
-        // 첫 줄: 추가 버튼 + 관리자
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -753,7 +758,6 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
               Expanded(child: _buildMemberTile(owner[0], ownerId)),
           ],
         ),
-        // 이후 일반 멤버 2명씩
         for (int i = 0; i < normalMembers.length; i += 2) ...[
           const SizedBox(height: 12),
           Row(
@@ -838,8 +842,6 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
     );
   }
 
-  // 프로필 이미지 or 이니셜 아바타
-  // TODO: profileImage 필드 추가되면 NetworkImage로 교체
   Widget _buildAvatar(Map<String, dynamic> member, {double radius = 22}) {
     final name = member['userName'] as String? ?? '?';
     final profileImage = member['profileImage'] as String?;
@@ -927,7 +929,6 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 상단 헤더
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
             child: Column(
@@ -951,9 +952,10 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
               ],
             ),
           ),
-
-          // 흰색 카드
           Container(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.of(context).size.height,
+            ),
             decoration: const BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -962,8 +964,6 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 24),
-
-                // 멤버 섹션 헤더
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Row(
@@ -1000,16 +1000,11 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-
-                // 멤버 그리드: 첫줄(추가버튼+관리자), 이후 2명씩
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: _buildMemberGrid(members, ownerId),
                 ),
-
                 const SizedBox(height: 28),
-
-                // 프로젝트 섹션
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Row(
@@ -1024,7 +1019,13 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
                         ),
                       ),
                       GestureDetector(
-                        onTap: () {},
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                ProjectListScreen(spaceId: widget.spaceId),
+                          ),
+                        ),
                         child: const Row(
                           children: [
                             Text(
@@ -1051,7 +1052,16 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
                   child: Column(
                     children: [
                       GestureDetector(
-                        onTap: () {},
+                        onTap: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  ProjectCreateScreen(spaceId: widget.spaceId),
+                            ),
+                          );
+                          if (result == true) _loadData();
+                        },
                         child: Row(
                           children: [
                             Image.asset(
@@ -1072,20 +1082,68 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF9F9F9),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Center(
-                          child: Text(
-                            '프로젝트 구현 후 표시됩니다',
-                            style: TextStyle(fontSize: 13, color: Colors.grey),
+                      if (_projects.isEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF9F9F9),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        ),
-                      ),
+                          child: const Center(
+                            child: Text(
+                              '프로젝트가 없어요',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        ..._projects.take(5).map((project) {
+                          return GestureDetector(
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ProjectDetailScreen(
+                                  projectId: project['id'],
+                                ),
+                              ),
+                            ),
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF9F9F9),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      project['name'] ?? '',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF1A1A2E),
+                                      ),
+                                    ),
+                                  ),
+                                  // TODO: dueDate 추가되면 D-day 표시
+                                  const Icon(
+                                    Icons.chevron_right,
+                                    color: Colors.grey,
+                                    size: 18,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }),
                     ],
                   ),
                 ),
