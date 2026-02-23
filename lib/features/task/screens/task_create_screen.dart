@@ -331,7 +331,6 @@ class _TaskCreateScreenState extends State<TaskCreateScreen> {
                                   const SizedBox(height: 8),
                                   Row(
                                     children: [
-                                      // 선택된 담당자 아바타
                                       ...List.generate(_assignees.length, (
                                         index,
                                       ) {
@@ -387,16 +386,15 @@ class _TaskCreateScreenState extends State<TaskCreateScreen> {
                                           ),
                                         );
                                       }),
-                                      // 담당자 추가 버튼
                                       GestureDetector(
                                         onTap: () {
-                                          // TODO: 멤버 목록 모달 연결
+                                          // TODO: 프로젝트 멤버 목록 모달 연결
                                         },
                                         child: Image.asset(
-                                          'lib/assets/images/ProfileCircle.png', // 원하는 PNG 경로
+                                          'lib/assets/images/AddButton_circle.png',
                                           width: 40,
                                           height: 40,
-                                          color: Colors.grey[400],
+                                          color: Colors.grey,
                                         ),
                                       ),
                                     ],

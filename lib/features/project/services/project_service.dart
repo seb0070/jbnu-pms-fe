@@ -52,4 +52,13 @@ class ProjectService {
     );
     return res.data['data'];
   }
+
+  Future<List<Map<String, dynamic>>> getTasks(int projectId) async {
+    final res = await _dio.get(
+      '/tasks',
+      queryParameters: {'projectId': projectId},
+      options: await _authOptions(),
+    );
+    return List<Map<String, dynamic>>.from(res.data['data']);
+  }
 }
