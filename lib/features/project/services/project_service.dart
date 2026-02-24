@@ -61,4 +61,17 @@ class ProjectService {
     );
     return List<Map<String, dynamic>>.from(res.data['data']);
   }
+
+  Future<Map<String, dynamic>> getTask(int taskId) async {
+    final res = await _dio.get('/tasks/$taskId', options: await _authOptions());
+    return res.data['data'];
+  }
+
+  Future<void> updateTask(int taskId, Map<String, dynamic> data) async {
+    await _dio.put('/tasks/$taskId', data: data, options: await _authOptions());
+  }
+
+  Future<void> deleteTask(int taskId) async {
+    await _dio.delete('/tasks/$taskId', options: await _authOptions());
+  }
 }

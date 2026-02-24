@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../features/project/services/project_service.dart';
 import 'task_create_screen.dart';
+import 'task_detail_screen.dart';
 
 class TaskListScreen extends StatefulWidget {
   final int projectId;
@@ -203,130 +204,136 @@ class _TaskListScreenState extends State<TaskListScreen> {
       }
     }
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF9F9F9),
-        borderRadius: BorderRadius.circular(12),
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => TaskDetailScreen(taskId: task['id'])),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 윗줄: 작업 이름
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1A1A2E),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF9F9F9),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 윗줄: 작업 이름
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A1A2E),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                // 아랫줄: 상태, 우선순위, 마감일
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        statusLabel,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: statusColor,
-                          fontWeight: FontWeight.w600,
+                  const SizedBox(height: 8),
+                  // 아랫줄: 상태, 우선순위, 마감일
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: statusColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          statusLabel,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: statusColor,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: priorityColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        priorityLabel,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: priorityColor,
-                          fontWeight: FontWeight.w600,
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: priorityColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          priorityLabel,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: priorityColor,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(
-                      Icons.calendar_today_rounded,
-                      size: 11,
-                      color: dueDateColor,
-                    ),
-                    const SizedBox(width: 3),
-                    Text(
-                      dueDateLabel,
-                      style: TextStyle(
-                        fontSize: 11,
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.calendar_today_rounded,
+                        size: 11,
                         color: dueDateColor,
-                        fontWeight: FontWeight.w600,
                       ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          // 담당자 아바타
-          if (assignees.isEmpty)
-            const CircleAvatar(
-              radius: 14,
-              backgroundColor: Color(0xFFEEEEEE),
-              child: Icon(Icons.person, size: 16, color: Colors.grey),
-            )
-          else
-            SizedBox(
-              width: assignees.take(3).length * 22.0,
-              height: 28,
-              child: Stack(
-                children: assignees.take(3).toList().asMap().entries.map((e) {
-                  final assignee = e.value as Map<String, dynamic>;
-                  final name = assignee['name'] as String? ?? '?';
-                  final profileImage = assignee['profileImage'] as String?;
-                  return Positioned(
-                    left: e.key * 16.0,
-                    child: CircleAvatar(
-                      radius: 14,
-                      backgroundColor: _lightPurple,
-                      backgroundImage: profileImage != null
-                          ? NetworkImage(profileImage)
-                          : null,
-                      child: profileImage == null
-                          ? Text(
-                              name[0].toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            )
-                          : null,
-                    ),
-                  );
-                }).toList(),
+                      const SizedBox(width: 3),
+                      Text(
+                        dueDateLabel,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: dueDateColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-        ],
+            const SizedBox(width: 12),
+            // 담당자 아바타
+            if (assignees.isEmpty)
+              const CircleAvatar(
+                radius: 14,
+                backgroundColor: Color(0xFFEEEEEE),
+                child: Icon(Icons.person, size: 16, color: Colors.grey),
+              )
+            else
+              SizedBox(
+                width: assignees.take(3).length * 22.0,
+                height: 28,
+                child: Stack(
+                  children: assignees.take(3).toList().asMap().entries.map((e) {
+                    final assignee = e.value as Map<String, dynamic>;
+                    final name = assignee['name'] as String? ?? '?';
+                    final profileImage = assignee['profileImage'] as String?;
+                    return Positioned(
+                      left: e.key * 16.0,
+                      child: CircleAvatar(
+                        radius: 14,
+                        backgroundColor: _lightPurple,
+                        backgroundImage: profileImage != null
+                            ? NetworkImage(profileImage)
+                            : null,
+                        child: profileImage == null
+                            ? Text(
+                                name[0].toUpperCase(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              )
+                            : null,
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
