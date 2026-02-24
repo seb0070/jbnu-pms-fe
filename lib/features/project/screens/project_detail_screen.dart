@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/project_service.dart';
 import '../../task/screens/task_create_screen.dart';
+import '../../task/screens/task_list_screen.dart';
 
 class ProjectDetailScreen extends StatefulWidget {
   final int projectId;
@@ -287,7 +288,15 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                       ),
                       if (_tasks.length > 5)
                         GestureDetector(
-                          onTap: () {},
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => TaskListScreen(
+                                projectId: widget.projectId,
+                                projectName: _project?['name'] ?? '',
+                              ),
+                            ),
+                          ),
                           child: const Row(
                             children: [
                               Text(
