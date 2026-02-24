@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/project_service.dart';
 import '../../task/screens/task_create_screen.dart';
 import '../../task/screens/task_list_screen.dart';
+import '../../task/screens/task_detail_screen.dart';
 
 class ProjectDetailScreen extends StatefulWidget {
   final int projectId;
@@ -382,64 +383,70 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     final title = task['title'] as String? ?? '';
     final assignees = (task['assignees'] as List?) ?? [];
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF9F9F9),
-        borderRadius: BorderRadius.circular(12),
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => TaskDetailScreen(taskId: task['id'])),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF1A1A2E),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF9F9F9),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1A1A2E),
+                ),
               ),
             ),
-          ),
-          if (assignees.isEmpty)
-            const CircleAvatar(
-              radius: 14,
-              backgroundColor: Color(0xFFEEEEEE),
-              child: Icon(Icons.person, size: 16, color: Colors.grey),
-            )
-          else
-            SizedBox(
-              width: assignees.take(3).length * 22.0,
-              height: 28,
-              child: Stack(
-                children: assignees.take(3).toList().asMap().entries.map((e) {
-                  final assignee = e.value as Map<String, dynamic>;
-                  final name = assignee['name'] as String? ?? '?';
-                  final profileImage = assignee['profileImage'] as String?;
-                  return Positioned(
-                    left: e.key * 16.0,
-                    child: CircleAvatar(
-                      radius: 14,
-                      backgroundColor: _lightPurple,
-                      backgroundImage: profileImage != null
-                          ? NetworkImage(profileImage)
-                          : null,
-                      child: profileImage == null
-                          ? Text(
-                              name[0].toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            )
-                          : null,
-                    ),
-                  );
-                }).toList(),
+            if (assignees.isEmpty)
+              const CircleAvatar(
+                radius: 14,
+                backgroundColor: Color(0xFFEEEEEE),
+                child: Icon(Icons.person, size: 16, color: Colors.grey),
+              )
+            else
+              SizedBox(
+                width: assignees.take(3).length * 22.0,
+                height: 28,
+                child: Stack(
+                  children: assignees.take(3).toList().asMap().entries.map((e) {
+                    final assignee = e.value as Map<String, dynamic>;
+                    final name = assignee['name'] as String? ?? '?';
+                    final profileImage = assignee['profileImage'] as String?;
+                    return Positioned(
+                      left: e.key * 16.0,
+                      child: CircleAvatar(
+                        radius: 14,
+                        backgroundColor: _lightPurple,
+                        backgroundImage: profileImage != null
+                            ? NetworkImage(profileImage)
+                            : null,
+                        child: profileImage == null
+                            ? Text(
+                                name[0].toUpperCase(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              )
+                            : null,
+                      ),
+                    );
+                  }).toList(),
+                ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
