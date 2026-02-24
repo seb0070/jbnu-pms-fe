@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../user/services/user_service.dart';
 
@@ -90,9 +91,8 @@ class _MoreScreenState extends State<MoreScreen> {
                 SizedBox(
                   height: 56,
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      const SizedBox(width: 16),
-                      const Spacer(),
                       TextButton(
                         onPressed: () {
                           // TODO: 내 정보 화면으로 이동
@@ -161,7 +161,6 @@ class _MoreScreenState extends State<MoreScreen> {
                                       ),
                                     ),
                                     const SizedBox(height: 4),
-                                    // 직책 (백엔드 필드 추가 후 활성화)
                                     const Text(
                                       '-',
                                       style: TextStyle(
@@ -196,9 +195,6 @@ class _MoreScreenState extends State<MoreScreen> {
 
                               // 흰색 카드 영역
                               Container(
-                                // constraints: BoxConstraints(
-                                //   minHeight: MediaQuery.of(context).size.height,
-                                // ),
                                 decoration: const BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.vertical(
@@ -206,29 +202,35 @@ class _MoreScreenState extends State<MoreScreen> {
                                   ),
                                 ),
                                 child: Padding(
-                                  padding: const EdgeInsets.all(20),
+                                  padding: const EdgeInsets.fromLTRB(
+                                    20,
+                                    24,
+                                    20,
+                                    40,
+                                  ),
                                   child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      const SizedBox(height: 4),
-
                                       // 앱 설정
                                       _buildSectionTitle('앱 설정'),
                                       const SizedBox(height: 8),
                                       _buildMenuCard([
                                         _buildMenuItem(
-                                          icon: Icons.notifications_outlined,
+                                          iconPath:
+                                              'lib/assets/icons/more_notification.svg',
                                           title: '알림 설정',
                                           onTap: () {},
                                         ),
                                         _buildMenuItem(
-                                          icon: Icons.dark_mode_outlined,
+                                          iconPath:
+                                              'lib/assets/icons/more_darkmode.svg',
                                           title: '다크모드',
                                           onTap: () {},
                                         ),
                                         _buildMenuItem(
-                                          icon: Icons.language_outlined,
+                                          iconPath:
+                                              'lib/assets/icons/more_global.svg',
                                           title: '언어',
                                           onTap: () {},
                                           isLast: true,
@@ -241,13 +243,14 @@ class _MoreScreenState extends State<MoreScreen> {
                                       const SizedBox(height: 8),
                                       _buildMenuCard([
                                         _buildMenuItem(
-                                          icon: Icons.help_outline_rounded,
+                                          iconPath:
+                                              'lib/assets/icons/more_info_circle.svg',
                                           title: '도움말',
                                           onTap: () {},
                                         ),
                                         _buildMenuItem(
-                                          icon:
-                                              Icons.chat_bubble_outline_rounded,
+                                          iconPath:
+                                              'lib/assets/icons/more_question.svg',
                                           title: '문의하기',
                                           onTap: () {},
                                           isLast: true,
@@ -260,17 +263,20 @@ class _MoreScreenState extends State<MoreScreen> {
                                       const SizedBox(height: 8),
                                       _buildMenuCard([
                                         _buildMenuItem(
-                                          icon: Icons.settings_outlined,
+                                          iconPath:
+                                              'lib/assets/icons/more_ToS.svg',
                                           title: '이용약관',
                                           onTap: () {},
                                         ),
                                         _buildMenuItem(
-                                          icon: Icons.privacy_tip_outlined,
+                                          iconPath:
+                                              'lib/assets/icons/more_personal_doc.svg',
                                           title: '개인정보 처리방침',
                                           onTap: () {},
                                         ),
                                         _buildMenuItem(
-                                          icon: Icons.info_outline_rounded,
+                                          iconPath:
+                                              'lib/assets/icons/more_version.svg',
                                           title: '버전정보',
                                           trailing: const Text(
                                             '1.0.0',
@@ -282,7 +288,8 @@ class _MoreScreenState extends State<MoreScreen> {
                                           onTap: () {},
                                         ),
                                         _buildMenuItem(
-                                          icon: Icons.logout_rounded,
+                                          iconPath:
+                                              'lib/assets/icons/more_logout.svg',
                                           title: 'Logout',
                                           isLogout: true,
                                           onTap: _logout,
@@ -290,7 +297,6 @@ class _MoreScreenState extends State<MoreScreen> {
                                           showArrow: false,
                                         ),
                                       ]),
-                                      const SizedBox(height: 40),
                                     ],
                                   ),
                                 ),
@@ -329,7 +335,7 @@ class _MoreScreenState extends State<MoreScreen> {
   }
 
   Widget _buildMenuItem({
-    required IconData icon,
+    required String iconPath,
     required String title,
     Widget? trailing,
     required VoidCallback onTap,
@@ -346,7 +352,15 @@ class _MoreScreenState extends State<MoreScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
-                Icon(icon, color: isLogout ? Colors.red : _purple, size: 22),
+                SvgPicture.asset(
+                  iconPath,
+                  width: 22,
+                  height: 22,
+                  colorFilter: ColorFilter.mode(
+                    isLogout ? Colors.red : _purple,
+                    BlendMode.srcIn,
+                  ),
+                ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Text(
