@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../user/services/user_service.dart';
+import '../../auth/services/auth_service.dart';
 import '../../auth/screens/onboarding_screen.dart';
 
 class MoreScreen extends StatefulWidget {
@@ -18,14 +19,14 @@ class _MoreScreenState extends State<MoreScreen> {
 
   static const _purple = Color(0xFF6C5CE7);
 
-  // ✅ 보라색 영역: "중간 정도" (너 화면 기준 이 값이 자리낭비 줄이면서도 자연스럽게 보임)
+  // 보라색 영역
   static const double _headerHeight = 350;
 
-  // ✅ 아바타 더 크게
+  // 아바타 더 크게
   static const double _avatarSize = 112;
 
-  // ✅ 카드가 보라색을 얼마나 덮을지(클수록 카드/아바타가 위로 올라감)
-  static const double _overlap = 220; // 60~95 사이에서 취향 조절
+  // 흰색 카드와 보라색 배경이 겹치는 정도
+  static const double _overlap = 220;
 
   @override
   void initState() {
@@ -65,8 +66,7 @@ class _MoreScreenState extends State<MoreScreen> {
           TextButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.clear();
+              await AuthService().signOut();
               if (mounted) {
                 Navigator.pushAndRemoveUntil(
                   context,
@@ -87,10 +87,10 @@ class _MoreScreenState extends State<MoreScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 카드가 보라색을 덮는 시작 위치 (더 위로 올리고 싶으면 _overlap 키우면 됨)
+    // 카드가 보라색을 덮는 시작 위치
     final double cardTop = _headerHeight - _overlap;
 
-    // 아바타가 카드에 "1/4만" 걸치게: 아래로 내려가는 길이 = size*0.25
+    // 아바타가 카드와 보라색 영역에 절반씩 걸치게
     final double avatarTop = cardTop - (_avatarSize * 0.5);
 
     final String name = _isLoading ? '' : (_user?['name'] ?? '-');

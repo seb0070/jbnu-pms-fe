@@ -275,12 +275,21 @@ class AuthService {
   // 로그아웃
   Future<void> signOut() async {
     try {
+      // 1. 서버 로그아웃
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+      await _dio.post(
+        '/auth/logout',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+    } catch (e) {
+      _logger.e('서버 로그아웃 에러', error: e);
+    } finally {
+      // 2. 구글 로그아웃 + 로컬 토큰 삭제
       await _googleSignIn.signOut();
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
       _logger.i('로그아웃 완료');
-    } catch (e) {
-      _logger.e('로그아웃 에러', error: e);
     }
   }
 
