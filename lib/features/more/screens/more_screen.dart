@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../user/services/user_service.dart';
+import '../../auth/screens/onboarding_screen.dart';
 
 class MoreScreen extends StatefulWidget {
   const MoreScreen({super.key});
@@ -67,9 +68,9 @@ class _MoreScreenState extends State<MoreScreen> {
               final prefs = await SharedPreferences.getInstance();
               await prefs.clear();
               if (mounted) {
-                Navigator.pushNamedAndRemoveUntil(
+                Navigator.pushAndRemoveUntil(
                   context,
-                  '/login',
+                  MaterialPageRoute(builder: (_) => const OnboardingScreen()),
                   (route) => false,
                 );
               }
@@ -170,7 +171,7 @@ class _MoreScreenState extends State<MoreScreen> {
                           child: Container(
                             decoration: BoxDecoration(
                               color: Colors.white,
-                              // ✅ 위에만 둥글게
+                              // 위에만 둥글게
                               borderRadius: const BorderRadius.vertical(
                                 top: Radius.circular(26),
                               ),
@@ -184,7 +185,7 @@ class _MoreScreenState extends State<MoreScreen> {
                             ),
                             child: Column(
                               children: [
-                                // ✅ 아바타 크기(112) 기준으로 여백 조금 넉넉히
+                                // 프로필 사진 크기
                                 const SizedBox(height: 64),
 
                                 // ===== 내 정보 (고정) =====
