@@ -4,6 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../user/services/user_service.dart';
 import '../../auth/services/auth_service.dart';
 import '../../auth/screens/onboarding_screen.dart';
+import 'terms_screen.dart';
+import 'privacy_screen.dart';
 
 class MoreScreen extends StatefulWidget {
   const MoreScreen({super.key});
@@ -294,13 +296,25 @@ class _MoreScreenState extends State<MoreScreen> {
                                               iconPath:
                                                   'lib/assets/icons/more_ToS.svg',
                                               title: '이용약관',
-                                              onTap: () {},
+                                              onTap: () => Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) =>
+                                                      const TermsScreen(),
+                                                ),
+                                              ),
                                             ),
                                             _menuItem(
                                               iconPath:
                                                   'lib/assets/icons/more_personal_doc.svg',
-                                              title: '개인정보 처리방침',
-                                              onTap: () {},
+                                              title: '개인정보처리방침',
+                                              onTap: () => Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) =>
+                                                      const PrivacyScreen(),
+                                                ),
+                                              ),
                                             ),
                                             _menuItem(
                                               iconPath:
