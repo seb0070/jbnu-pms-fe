@@ -6,6 +6,7 @@ import '../../auth/services/auth_service.dart';
 import '../../auth/screens/onboarding_screen.dart';
 import 'terms_screen.dart';
 import 'privacy_screen.dart';
+import '../../user/screens/my_profile_screen.dart';
 
 class MoreScreen extends StatefulWidget {
   const MoreScreen({super.key});
@@ -98,7 +99,9 @@ class _MoreScreenState extends State<MoreScreen> {
     final String name = _isLoading ? '' : (_user?['name'] ?? '-');
     final String role = _isLoading
         ? ''
-        : (_user?['role'] ?? 'Junior Full Stack Developer');
+        : ((_user?['position'] as String?)?.isNotEmpty == true
+              ? _user!['position']
+              : '직책 미설정');
     final String email = _isLoading ? '' : (_user?['email'] ?? '-');
 
     return Scaffold(
@@ -141,7 +144,12 @@ class _MoreScreenState extends State<MoreScreen> {
                       ),
                       const Spacer(),
                       TextButton(
-                        onPressed: () {},
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const MyProfileScreen(),
+                          ),
+                        ).then((_) => _loadUser()),
                         style: TextButton.styleFrom(
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(
