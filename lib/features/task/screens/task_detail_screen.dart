@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../file/services/file_service.dart';
 import '../../../features/project/services/project_service.dart';
 import 'task_create_screen.dart';
 
@@ -16,6 +20,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   final FocusNode _commentFocusNode = FocusNode();
   Map<String, dynamic>? _task;
   bool _isLoading = true;
+  int? _currentUserId;
+  bool _isViewer = false;
+  List<Map<String, dynamic>> _files = [];
+  bool _isFilesLoading = true;
+  bool _isUploading = false;
+  final FileService _fileService = FileService();
 
   static const _purple = Color(0xFF6C5CE7);
   static const _lightPurple = Color(0xFFA89AF7);
@@ -37,6 +47,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   Future<void> _loadTask() async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      _currentUserId = prefs.getInt('user_id');
       final task = await _projectService.getTask(widget.taskId);
       setState(() {
         _task = task;
@@ -44,6 +56,80 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       });
     } catch (e) {
       setState(() => _isLoading = false);
+    }
+    _loadFiles();
+  }
+
+  Future<void> _loadFiles() async {
+    try {
+      final files = await _fileService.getTaskFiles(widget.taskId);
+      setState(() {
+        _files = files;
+        _isFilesLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isFilesLoading = false);
+    }
+  }
+
+  Future<void> _uploadFile() async {
+    final result = await FilePicker.platform.pickFiles();
+    if (result == null || result.files.single.path == null) return;
+    setState(() => _isUploading = true);
+    try {
+      await _fileService.uploadTaskFile(
+        widget.taskId,
+        File(result.files.single.path!),
+      );
+      await _loadFiles();
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('업로드에 실패했어요')));
+    } finally {
+      setState(() => _isUploading = false);
+    }
+  }
+
+  Future<void> _deleteFile(Map<String, dynamic> file) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          '파일을 삭제할까요?',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          file['fileName'] ?? '',
+          style: const TextStyle(fontSize: 14, color: Colors.grey),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              '삭제',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await _fileService.deleteTaskFile(widget.taskId, file['id'] as int);
+      await _loadFiles();
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('삭제에 실패했어요')));
     }
   }
 
@@ -825,50 +911,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 const SizedBox(height: 24),
 
                 // 첨부 파일
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20),
-                  child: Text(
-                    '첨부 파일',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1A1A2E),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: GestureDetector(
-                    onTap: () {
-                      // TODO: 파일 업로드 (S3 연동 후 활성화)
-                    },
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF9F9F9),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFEEEEEE)),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.attach_file_rounded,
-                            color: Colors.grey,
-                            size: 18,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            '첨부 파일 추가',
-                            style: TextStyle(fontSize: 14, color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+                _buildFileSection(),
                 const SizedBox(height: 24),
                 const Divider(height: 1, color: Color(0xFFF0F0F0)),
                 const SizedBox(height: 24),
@@ -901,6 +944,244 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildFileSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '첨부파일 (${_files.length})',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1A1A2E),
+                ),
+              ),
+              if (!_isViewer)
+                GestureDetector(
+                  onTap: _isUploading ? null : _uploadFile,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0EEFF),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: _isUploading
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              color: Color(0xFF6C5CE7),
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Row(
+                            children: [
+                              Icon(
+                                Icons.upload_rounded,
+                                size: 14,
+                                color: Color(0xFF6C5CE7),
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                '업로드',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF6C5CE7),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (_isFilesLoading)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(color: Color(0xFF6C5CE7)),
+            ),
+          )
+        else if (_files.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF9F9F9),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Center(
+                child: Text(
+                  '첨부된 파일이 없어요',
+                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                ),
+              ),
+            ),
+          )
+        else
+          ..._files.map((file) => _buildFileCard(file)),
+      ],
+    );
+  }
+
+  Widget _buildFileCard(Map<String, dynamic> file) {
+    final fileName = file['fileName'] as String? ?? '';
+    final fileSize = file['fileSize'] as int? ?? 0;
+    final uploaderName = file['uploaderName'] as String? ?? '';
+    final uploaderId = file['uploaderId'];
+    final createdAt = file['createdAt'] as String?;
+    final isMyFile = uploaderId != null && uploaderId == _currentUserId;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9F9F9),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: _fileIconColor(fileName).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              _fileIcon(fileName),
+              color: _fileIconColor(fileName),
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  fileName,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1A1A2E),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '$uploaderName · ${_formatDate(createdAt)} · ${_formatFileSize(fileSize)}',
+                  style: TextStyle(fontSize: 11, color: Colors.grey[400]),
+                ),
+              ],
+            ),
+          ),
+          if (isMyFile && !_isViewer)
+            GestureDetector(
+              onTap: () => _deleteFile(file),
+              child: Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Icon(
+                  Icons.delete_outline_rounded,
+                  size: 18,
+                  color: Colors.grey[400],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  IconData _fileIcon(String fileName) {
+    final ext = fileName.split('.').last.toLowerCase();
+    switch (ext) {
+      case 'pdf':
+        return Icons.picture_as_pdf_rounded;
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+      case 'webp':
+        return Icons.image_rounded;
+      case 'zip':
+      case 'rar':
+      case '7z':
+        return Icons.folder_zip_rounded;
+      case 'doc':
+      case 'docx':
+        return Icons.description_rounded;
+      case 'xls':
+      case 'xlsx':
+        return Icons.table_chart_rounded;
+      case 'ppt':
+      case 'pptx':
+        return Icons.slideshow_rounded;
+      default:
+        return Icons.insert_drive_file_rounded;
+    }
+  }
+
+  Color _fileIconColor(String fileName) {
+    final ext = fileName.split('.').last.toLowerCase();
+    switch (ext) {
+      case 'pdf':
+        return const Color(0xFFE53935);
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+      case 'webp':
+        return const Color(0xFF43A047);
+      case 'zip':
+      case 'rar':
+      case '7z':
+        return const Color(0xFFFF9800);
+      case 'doc':
+      case 'docx':
+        return const Color(0xFF1565C0);
+      case 'xls':
+      case 'xlsx':
+        return const Color(0xFF2E7D32);
+      case 'ppt':
+      case 'pptx':
+        return const Color(0xFFD84315);
+      default:
+        return const Color(0xFF6C5CE7);
+    }
+  }
+
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '${bytes}B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)}KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)}MB';
+  }
+
+  String _formatDate(String? dateStr) {
+    if (dateStr == null) return '';
+    final date = DateTime.tryParse(dateStr);
+    if (date == null) return '';
+    final diff = DateTime.now().difference(date);
+    if (diff.inDays >= 7) return '${date.month}/${date.day}';
+    if (diff.inDays >= 1) return '${diff.inDays}일 전';
+    if (diff.inHours >= 1) return '${diff.inHours}시간 전';
+    return '방금 전';
   }
 
   Widget _buildAvatar(Map<String, dynamic>? user, {double radius = 18}) {
