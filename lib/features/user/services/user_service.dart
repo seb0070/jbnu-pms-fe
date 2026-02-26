@@ -23,6 +23,13 @@ class UserService {
     return res.data['data'];
   }
 
+  // 특정 유저 정보 조회
+  // GET /users/{userId}
+  Future<Map<String, dynamic>> getUserById(int userId) async {
+    final res = await _dio.get('/users/$userId', options: await _authOptions());
+    return res.data['data'];
+  }
+
   // 사용자 정보 수정 (name, password, position 중 변경할 항목만 전달)
   // PATCH /users/{userId}
   Future<Map<String, dynamic>> updateUser(
