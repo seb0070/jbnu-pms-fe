@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../file/services/file_service.dart';
+import '../../../shared/widgets/download_manager.dart';
 import '../../../features/project/services/project_service.dart';
 import 'task_create_screen.dart';
 
@@ -1039,17 +1040,16 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     );
   }
 
-  Future<void> _downloadFile(Map<String, dynamic> file) async {
+  void _downloadFile(Map<String, dynamic> file) {
     final fileName = file['fileName'] as String? ?? '';
     final fileId = file['id'] as int;
-    try {
-      await _fileService.downloadTaskFile(widget.taskId, fileId, fileName);
-    } catch (e) {
-      if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('다운로드에 실패했어요')));
-    }
+    final downloadUrl =
+        'http://10.0.2.2:8080/tasks/${widget.taskId}/files/$fileId/download';
+    DownloadManager().download(
+      context: context,
+      fileName: fileName,
+      downloadUrl: downloadUrl,
+    );
   }
 
   Widget _buildFileCard(Map<String, dynamic> file) {
