@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class FileService {
@@ -16,22 +18,22 @@ class FileService {
     return Options(headers: {'Authorization': 'Bearer $token'});
   }
 
-  // 프로젝트 전체 파일 조회 (프로젝트 파일 + 태스크 파일)
-  Future<List<Map<String, dynamic>>> getAllProjectFiles(int projectId) async {
+  // 프로젝트 파일만 조회
+  Future<List<Map<String, dynamic>>> getProjectFiles(int projectId) async {
     final options = await _authOptions();
     final res = await _dio.get(
-      '$baseUrl/projects/$projectId/files/all',
+      '$baseUrl/projects/$projectId/files',
       options: options,
     );
     final List data = res.data['data'] ?? [];
     return data.cast<Map<String, dynamic>>();
   }
 
-  // 프로젝트 파일만 조회
-  Future<List<Map<String, dynamic>>> getProjectFiles(int projectId) async {
+  // 프로젝트 전체 파일 조회 (프로젝트 파일 + 태스크 파일)
+  Future<List<Map<String, dynamic>>> getAllProjectFiles(int projectId) async {
     final options = await _authOptions();
     final res = await _dio.get(
-      '$baseUrl/projects/$projectId/files',
+      '$baseUrl/projects/$projectId/files/all',
       options: options,
     );
     final List data = res.data['data'] ?? [];
@@ -61,6 +63,23 @@ class FileService {
       '$baseUrl/projects/$projectId/files/$fileId',
       options: options,
     );
+  }
+
+  // 프로젝트 파일 다운로드
+  Future<void> downloadProjectFile(
+    int projectId,
+    int fileId,
+    String fileName,
+  ) async {
+    final token = await _getToken();
+    final dir = await getApplicationDocumentsDirectory();
+    final savePath = '${dir.path}/$fileName';
+    await _dio.download(
+      '$baseUrl/projects/$projectId/files/$fileId/download',
+      savePath,
+      options: Options(headers: {'Authorization': 'Bearer $token'}),
+    );
+    await OpenFilex.open(savePath);
   }
 
   // 태스크 파일 조회
@@ -94,5 +113,18 @@ class FileService {
   Future<void> deleteTaskFile(int taskId, int fileId) async {
     final options = await _authOptions();
     await _dio.delete('$baseUrl/tasks/$taskId/files/$fileId', options: options);
+  }
+
+  // 태스크 파일 다운로드
+  Future<void> downloadTaskFile(int taskId, int fileId, String fileName) async {
+    final token = await _getToken();
+    final dir = await getApplicationDocumentsDirectory();
+    final savePath = '${dir.path}/$fileName';
+    await _dio.download(
+      '$baseUrl/tasks/$taskId/files/$fileId/download',
+      savePath,
+      options: Options(headers: {'Authorization': 'Bearer $token'}),
+    );
+    await OpenFilex.open(savePath);
   }
 }

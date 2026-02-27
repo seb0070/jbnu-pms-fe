@@ -3,10 +3,12 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../file/services/file_service.dart';
+import '../../../shared/widgets/download_manager.dart';
 import '../services/project_service.dart';
 import '../../task/screens/task_create_screen.dart';
 import '../../task/screens/task_list_screen.dart';
 import '../../task/screens/task_detail_screen.dart';
+import 'project_edit_screen.dart';
 
 class ProjectDetailScreen extends StatefulWidget {
   final int projectId;
@@ -23,6 +25,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   bool _isLoading = true;
   int? _currentUserId;
   bool _isViewer = false;
+  bool _isAdmin = false;
+  String _myRole = 'MEMBER';
   List<Map<String, dynamic>> _files = [];
   bool _isFilesLoading = true;
   bool _isUploading = false;
@@ -43,9 +47,20 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
       _currentUserId = prefs.getInt('user_id');
       final project = await _projectService.getProject(widget.projectId);
       final tasks = await _projectService.getTasks(widget.projectId);
+      // 현재 유저 역할 파악
+      final members = (project['members'] as List?) ?? [];
+      final myMember = members.firstWhere(
+        (m) => m['userId'] == _currentUserId,
+        orElse: () => <String, dynamic>{},
+      );
+      final myRole = myMember['role'] as String? ?? 'MEMBER';
+
       setState(() {
         _project = project;
         _tasks = tasks;
+        _myRole = myRole;
+        _isViewer = myRole == 'VIEWER';
+        _isAdmin = myRole == 'ADMIN';
         _isLoading = false;
       });
     } catch (e) {
@@ -127,6 +142,120 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     }
   }
 
+  void _showBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(
+                Icons.edit_outlined,
+                color: Color(0xFF6C5CE7),
+              ),
+              title: const Text(
+                '프로젝트 수정',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProjectEditScreen(
+                      projectId: widget.projectId,
+                      project: _project!,
+                    ),
+                  ),
+                );
+                if (result == true) _loadData();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.red),
+              title: const Text(
+                '프로젝트 삭제',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    title: const Text(
+                      '프로젝트를 삭제할까요?',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    content: const Text(
+                      '삭제된 프로젝트는 복구할 수 없어요.',
+                      style: TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text(
+                          '취소',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text(
+                          '삭제',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed == true) {
+                  try {
+                    await _projectService.deleteProject(widget.projectId);
+                    if (mounted) Navigator.pop(context, true);
+                  } catch (e) {
+                    if (mounted)
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('삭제에 실패했어요')),
+                      );
+                  }
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -155,12 +284,16 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                       ),
                       const Spacer(),
                       IconButton(
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.more_vert,
-                          color: Color(0xFF1A1A2E),
+                          color: _isAdmin
+                              ? const Color(0xFF1A1A2E)
+                              : Colors.grey[300],
                           size: 22,
                         ),
-                        onPressed: () {},
+                        onPressed: (_project == null || !_isAdmin)
+                            ? null
+                            : _showBottomSheet,
                       ),
                     ],
                   ),
@@ -331,8 +464,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                             const SizedBox(width: 10),
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
-                                Text(
+                              children: [
+                                const Text(
                                   '마감일',
                                   style: TextStyle(
                                     fontSize: 11,
@@ -340,7 +473,16 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                                   ),
                                 ),
                                 Text(
-                                  '-', // TODO: 백엔드 dueDate 추가되면 교체
+                                  _project?['dueDate'] != null
+                                      ? () {
+                                          final d = DateTime.tryParse(
+                                            _project!['dueDate'] as String,
+                                          );
+                                          return d != null
+                                              ? '${d.year}. ${d.month}. ${d.day}.'
+                                              : '-';
+                                        }()
+                                      : '-',
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
@@ -479,7 +621,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '첨부파일 (${_files.length})',
+                '첨부 파일 (${_files.length})',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -562,6 +704,18 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     );
   }
 
+  void _downloadFile(Map<String, dynamic> file) {
+    final fileName = file['fileName'] as String? ?? '';
+    final fileId = file['id'] as int;
+    final downloadUrl =
+        'http://10.0.2.2:8080/projects/${widget.projectId}/files/$fileId/download';
+    DownloadManager().download(
+      context: context,
+      fileName: fileName,
+      downloadUrl: downloadUrl,
+    );
+  }
+
   Widget _buildFileCard(Map<String, dynamic> file) {
     final fileName = file['fileName'] as String? ?? '';
     final fileSize = file['fileSize'] as int? ?? 0;
@@ -569,65 +723,81 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     final uploaderId = file['uploaderId'];
     final createdAt = file['createdAt'] as String?;
     final isMyFile = uploaderId != null && uploaderId == _currentUserId;
+    final isTaskFile = file['taskFileId'] != null;
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF9F9F9),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: _fileIconColor(fileName).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              _fileIcon(fileName),
-              color: _fileIconColor(fileName),
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  fileName,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1A1A2E),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '\$uploaderName · \${_formatDate(createdAt)} · \${_formatFileSize(fileSize)}',
-                  style: TextStyle(fontSize: 11, color: Colors.grey[400]),
-                ),
-              ],
-            ),
-          ),
-          if (isMyFile && !_isViewer)
-            GestureDetector(
-              onTap: () => _deleteFile(file),
-              child: Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: Icon(
-                  Icons.delete_outline_rounded,
-                  size: 18,
-                  color: Colors.grey[400],
-                ),
+    return GestureDetector(
+      onTap: () => _downloadFile(file),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF9F9F9),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: _fileIconColor(fileName).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                _fileIcon(fileName),
+                color: _fileIconColor(fileName),
+                size: 20,
               ),
             ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    fileName,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A1A2E),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '\$uploaderName · \${_formatDate(createdAt)} · \${_formatFileSize(fileSize)}',
+                    style: TextStyle(fontSize: 11, color: Colors.grey[400]),
+                  ),
+                ],
+              ),
+            ),
+            if (isMyFile && !_isViewer)
+              isTaskFile
+                  ? Tooltip(
+                      message: '태스크에서 삭제해주세요',
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Icon(
+                          Icons.delete_outline_rounded,
+                          size: 18,
+                          color: Colors.grey[200],
+                        ),
+                      ),
+                    )
+                  : GestureDetector(
+                      onTap: () => _deleteFile(file),
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Icon(
+                          Icons.delete_outline_rounded,
+                          size: 18,
+                          color: Colors.grey[400],
+                        ),
+                      ),
+                    ),
+          ],
+        ),
       ),
     );
   }

@@ -67,11 +67,46 @@ class ProjectService {
     return res.data['data'];
   }
 
+  Future<void> updateProject(int projectId, Map<String, dynamic> data) async {
+    await _dio.patch(
+      '/projects/$projectId',
+      data: data,
+      options: await _authOptions(),
+    );
+  }
+
+  Future<void> deleteProject(int projectId) async {
+    await _dio.delete('/projects/$projectId', options: await _authOptions());
+  }
+
   Future<void> updateTask(int taskId, Map<String, dynamic> data) async {
     await _dio.put('/tasks/$taskId', data: data, options: await _authOptions());
   }
 
   Future<void> deleteTask(int taskId) async {
     await _dio.delete('/tasks/$taskId', options: await _authOptions());
+  }
+
+  Future<void> addAssignee(int taskId, int assigneeId) async {
+    await _dio.post(
+      '/tasks/$taskId/assignees',
+      queryParameters: {'assigneeId': assigneeId},
+      options: await _authOptions(),
+    );
+  }
+
+  Future<void> removeAssignee(int taskId, int assigneeId) async {
+    await _dio.delete(
+      '/tasks/$taskId/assignees/$assigneeId',
+      options: await _authOptions(),
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getProjectMembers(int projectId) async {
+    final res = await _dio.get(
+      '/projects/$projectId/members',
+      options: await _authOptions(),
+    );
+    return List<Map<String, dynamic>>.from(res.data['data']);
   }
 }

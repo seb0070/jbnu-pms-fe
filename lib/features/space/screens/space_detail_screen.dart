@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import '../../file/services/file_service.dart';
+import '../../../shared/widgets/download_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/space_service.dart';
 import '../../project/services/project_service.dart';
@@ -50,7 +51,11 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
           project['id'] as int,
         );
         for (final file in files) {
-          allFiles.add({...file, 'projectName': project['name']});
+          allFiles.add({
+            ...file,
+            'projectName': project['name'],
+            'projectId': project['id'],
+          });
         }
       }
       setState(() {
@@ -1271,58 +1276,83 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
     );
   }
 
+  void _downloadFile(Map<String, dynamic> file) {
+    final fileName = file['fileName'] as String? ?? '';
+    final fileId = file['id'] as int;
+    final projectId = file['projectId'] as int?;
+    final taskId = file['taskId'] as int?;
+
+    String downloadUrl;
+    if (taskId != null) {
+      downloadUrl = 'http://10.0.2.2:8080/tasks/$taskId/files/$fileId/download';
+    } else if (projectId != null) {
+      downloadUrl =
+          'http://10.0.2.2:8080/projects/$projectId/files/$fileId/download';
+    } else
+      return;
+
+    DownloadManager().download(
+      context: context,
+      fileName: fileName,
+      downloadUrl: downloadUrl,
+    );
+  }
+
   Widget _buildFileCard(Map<String, dynamic> file) {
     final fileName = file['fileName'] as String? ?? '';
     final fileSize = file['fileSize'] as int? ?? 0;
     final uploaderName = file['uploaderName'] as String? ?? '';
     final createdAt = file['createdAt'] as String?;
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF9F9F9),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: _fileIconColor(fileName).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
+    return GestureDetector(
+      onTap: () => _downloadFile(file),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF9F9F9),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: _fileIconColor(fileName).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                _fileIcon(fileName),
+                color: _fileIconColor(fileName),
+                size: 20,
+              ),
             ),
-            child: Icon(
-              _fileIcon(fileName),
-              color: _fileIconColor(fileName),
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  fileName,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1A1A2E),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    fileName,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A1A2E),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '\$uploaderName · \${_formatDate(createdAt)} · \${_formatFileSize(fileSize)}',
-                  style: TextStyle(fontSize: 11, color: Colors.grey[400]),
-                ),
-              ],
+                  const SizedBox(height: 3),
+                  Text(
+                    '\$uploaderName · \${_formatDate(createdAt)} · \${_formatFileSize(fileSize)}',
+                    style: TextStyle(fontSize: 11, color: Colors.grey[400]),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
