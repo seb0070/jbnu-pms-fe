@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -40,6 +41,28 @@ class UserService {
       '/users/$userId',
       data: data,
       options: await _authOptions(),
+    );
+    return res.data['data'];
+  }
+
+  // 프로필 이미지 업로드
+  // PATCH /users/{userId}/profile-image
+  Future<Map<String, dynamic>> updateProfileImage(
+    int userId,
+    File image,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+    final formData = FormData.fromMap({
+      'image': await MultipartFile.fromFile(
+        image.path,
+        filename: image.path.split('/').last,
+      ),
+    });
+    final res = await _dio.patch(
+      '/users/$userId/profile-image',
+      data: formData,
+      options: Options(headers: {'Authorization': 'Bearer $token'}),
     );
     return res.data['data'];
   }

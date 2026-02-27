@@ -11,9 +11,11 @@ class ChangePasswordScreen extends StatefulWidget {
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final UserService _userService = UserService();
+  final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmController = TextEditingController();
 
+  bool _obscureCurrent = true;
   bool _obscureNew = true;
   bool _obscureConfirm = true;
   bool _isSaving = false;
@@ -25,15 +27,21 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   @override
   void dispose() {
+    _currentPasswordController.dispose();
     _newPasswordController.dispose();
     _confirmController.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
+    final currentPassword = _currentPasswordController.text.trim();
     final newPassword = _newPasswordController.text.trim();
     final confirm = _confirmController.text.trim();
 
+    if (currentPassword.isEmpty) {
+      _showSnackBar('현재 비밀번호를 입력해주세요');
+      return;
+    }
     if (newPassword.isEmpty) {
       _showSnackBar('새 비밀번호를 입력해주세요');
       return;
@@ -53,13 +61,16 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
     setState(() => _isSaving = true);
     try {
-      await _userService.updateUser(widget.userId, {'password': newPassword});
+      await _userService.updateUser(widget.userId, {
+        'currentPassword': currentPassword,
+        'password': newPassword,
+      });
       if (mounted) {
         _showSnackBar('비밀번호를 변경했어요 ✓');
         Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted) _showSnackBar('변경에 실패했어요');
+      if (mounted) _showSnackBar('변경에 실패했어요. 현재 비밀번호를 확인해주세요');
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -83,7 +94,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           SafeArea(
             child: Column(
               children: [
-                // 앱바
                 SizedBox(
                   height: 56,
                   child: Row(
@@ -111,7 +121,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     ],
                   ),
                 ),
-
                 Expanded(
                   child: SingleChildScrollView(
                     keyboardDismissBehavior:
@@ -122,8 +131,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const SizedBox(height: 16),
-
-                          // 안내 문구
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(16),
@@ -153,8 +160,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                             ),
                           ),
                           const SizedBox(height: 24),
-
-                          // 입력 폼 카드
                           Container(
                             decoration: BoxDecoration(
                               color: Colors.white,
@@ -164,6 +169,17 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                _buildLabel('현재 비밀번호'),
+                                const SizedBox(height: 8),
+                                _buildPasswordField(
+                                  controller: _currentPasswordController,
+                                  hint: '현재 비밀번호',
+                                  obscure: _obscureCurrent,
+                                  onToggle: () => setState(
+                                    () => _obscureCurrent = !_obscureCurrent,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
                                 _buildLabel('새 비밀번호'),
                                 const SizedBox(height: 8),
                                 _buildPasswordField(
@@ -175,7 +191,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 20),
-
                                 _buildLabel('비밀번호 확인'),
                                 const SizedBox(height: 8),
                                 _buildPasswordField(
@@ -190,8 +205,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                             ),
                           ),
                           const SizedBox(height: 24),
-
-                          // 저장 버튼
                           SizedBox(
                             width: double.infinity,
                             height: 52,

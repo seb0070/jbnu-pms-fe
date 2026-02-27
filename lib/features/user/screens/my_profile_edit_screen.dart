@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../features/user/services/user_service.dart';
 import 'change_password_screen.dart';
 import 'delete_account_screen.dart';
@@ -20,6 +22,7 @@ class _MyProfileEditScreenState extends State<MyProfileEditScreen> {
   final _positionController = TextEditingController();
 
   bool _isEmailUser = false;
+  File? _pickedImage;
 
   static const _purple = Color(0xFF6C5CE7);
   static const _lightPurple = Color(0xFFA89AF7);
@@ -37,6 +40,16 @@ class _MyProfileEditScreenState extends State<MyProfileEditScreen> {
     _nameController.dispose();
     _positionController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
+    if (picked == null) return;
+    setState(() => _pickedImage = File(picked.path));
   }
 
   Future<void> _loadUser() async {
@@ -69,6 +82,9 @@ class _MyProfileEditScreenState extends State<MyProfileEditScreen> {
 
     setState(() => _isSaving = true);
     try {
+      if (_pickedImage != null) {
+        await _userService.updateProfileImage(_user!['id'], _pickedImage!);
+      }
       await _userService.updateUser(_user!['id'], {
         'name': name,
         'position': position,
@@ -144,34 +160,39 @@ class _MyProfileEditScreenState extends State<MyProfileEditScreen> {
                               const SizedBox(height: 28),
 
                               // ── 프로필 사진 ──
-                              Stack(
-                                children: [
-                                  _buildAvatar(96),
-                                  Positioned(
-                                    bottom: 0,
-                                    right: 0,
-                                    child: Container(
-                                      width: 28,
-                                      height: 28,
-                                      decoration: BoxDecoration(
-                                        color: _purple,
-                                        borderRadius: BorderRadius.circular(9),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: _purple.withOpacity(0.35),
-                                            blurRadius: 8,
-                                            offset: const Offset(0, 3),
+                              GestureDetector(
+                                onTap: _pickImage,
+                                child: Stack(
+                                  children: [
+                                    _buildAvatar(96),
+                                    Positioned(
+                                      bottom: 0,
+                                      right: 0,
+                                      child: Container(
+                                        width: 28,
+                                        height: 28,
+                                        decoration: BoxDecoration(
+                                          color: _purple,
+                                          borderRadius: BorderRadius.circular(
+                                            9,
                                           ),
-                                        ],
-                                      ),
-                                      child: const Icon(
-                                        Icons.camera_alt,
-                                        color: Colors.white,
-                                        size: 15,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: _purple.withOpacity(0.35),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 3),
+                                            ),
+                                          ],
+                                        ),
+                                        child: const Icon(
+                                          Icons.camera_alt,
+                                          color: Colors.white,
+                                          size: 15,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                               const SizedBox(height: 32),
 
@@ -296,27 +317,28 @@ class _MyProfileEditScreenState extends State<MyProfileEditScreen> {
                                   ),
                                   child: Column(
                                     children: [
-                                      // 비밀번호 변경 (이메일 유저만)
-                                      if (_isEmailUser) ...[
-                                        _buildAccountMenuItem(
-                                          icon: Icons.lock_outline,
-                                          label: '비밀번호 변경',
-                                          onTap: () => Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (_) =>
-                                                  ChangePasswordScreen(
-                                                    userId: _user!['id'],
-                                                  ),
-                                            ),
-                                          ),
-                                        ),
-                                        const Divider(
-                                          height: 1,
-                                          indent: 20,
-                                          color: Color(0xFFF0F0F0),
-                                        ),
-                                      ],
+                                      // 비밀번호 변경
+                                      _buildAccountMenuItem(
+                                        icon: Icons.lock_outline,
+                                        label: '비밀번호 변경',
+                                        disabled: !_isEmailUser,
+                                        onTap: !_isEmailUser
+                                            ? null
+                                            : () => Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) =>
+                                                      ChangePasswordScreen(
+                                                        userId: _user!['id'],
+                                                      ),
+                                                ),
+                                              ),
+                                      ),
+                                      const Divider(
+                                        height: 1,
+                                        indent: 20,
+                                        color: Color(0xFFF0F0F0),
+                                      ),
 
                                       // 회원 탈퇴
                                       _buildAccountMenuItem(
@@ -352,10 +374,15 @@ class _MyProfileEditScreenState extends State<MyProfileEditScreen> {
   Widget _buildAccountMenuItem({
     required IconData icon,
     required String label,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
     bool isDestructive = false,
+    bool disabled = false,
   }) {
-    final color = isDestructive ? Colors.red : const Color(0xFF1A1A2E);
+    final color = disabled
+        ? Colors.grey[400]!
+        : isDestructive
+        ? Colors.red
+        : const Color(0xFF1A1A2E);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(24),
@@ -432,7 +459,14 @@ class _MyProfileEditScreenState extends State<MyProfileEditScreen> {
     final name = _user?['name'] as String? ?? '?';
     return ClipRRect(
       borderRadius: BorderRadius.circular(22),
-      child: profileImage != null && profileImage.isNotEmpty
+      child: _pickedImage != null
+          ? Image.file(
+              _pickedImage!,
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+            )
+          : profileImage != null && profileImage.isNotEmpty
           ? Image.network(
               profileImage,
               width: size,
