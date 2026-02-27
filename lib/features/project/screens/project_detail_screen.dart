@@ -479,7 +479,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '첨부파일 (${_files.length})',
+                '첨부 파일 (\${_files.length})',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -562,6 +562,23 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     );
   }
 
+  Future<void> _downloadFile(Map<String, dynamic> file) async {
+    final fileName = file['fileName'] as String? ?? '';
+    final fileId = file['id'] as int;
+    try {
+      await _fileService.downloadProjectFile(
+        widget.projectId,
+        fileId,
+        fileName,
+      );
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('다운로드에 실패했어요')));
+    }
+  }
+
   Widget _buildFileCard(Map<String, dynamic> file) {
     final fileName = file['fileName'] as String? ?? '';
     final fileSize = file['fileSize'] as int? ?? 0;
@@ -570,64 +587,67 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     final createdAt = file['createdAt'] as String?;
     final isMyFile = uploaderId != null && uploaderId == _currentUserId;
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF9F9F9),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: _fileIconColor(fileName).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              _fileIcon(fileName),
-              color: _fileIconColor(fileName),
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  fileName,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1A1A2E),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '\$uploaderName · \${_formatDate(createdAt)} · \${_formatFileSize(fileSize)}',
-                  style: TextStyle(fontSize: 11, color: Colors.grey[400]),
-                ),
-              ],
-            ),
-          ),
-          if (isMyFile && !_isViewer)
-            GestureDetector(
-              onTap: () => _deleteFile(file),
-              child: Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: Icon(
-                  Icons.delete_outline_rounded,
-                  size: 18,
-                  color: Colors.grey[400],
-                ),
+    return GestureDetector(
+      onTap: () => _downloadFile(file),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF9F9F9),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: _fileIconColor(fileName).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                _fileIcon(fileName),
+                color: _fileIconColor(fileName),
+                size: 20,
               ),
             ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    fileName,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A1A2E),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '\$uploaderName · \${_formatDate(createdAt)} · \${_formatFileSize(fileSize)}',
+                    style: TextStyle(fontSize: 11, color: Colors.grey[400]),
+                  ),
+                ],
+              ),
+            ),
+            if (isMyFile && !_isViewer)
+              GestureDetector(
+                onTap: () => _deleteFile(file),
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Icon(
+                    Icons.delete_outline_rounded,
+                    size: 18,
+                    color: Colors.grey[400],
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
