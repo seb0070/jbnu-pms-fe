@@ -50,7 +50,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
       // 현재 유저 역할 파악
       final members = (project['members'] as List?) ?? [];
       final myMember = members.firstWhere(
-        (m) => m['userId'] == _currentUserId,
+        (m) => (m['userId'] as num?)?.toInt() == _currentUserId,
         orElse: () => <String, dynamic>{},
       );
       final myRole = myMember['role'] as String? ?? 'MEMBER';
@@ -621,7 +621,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '첨부 파일 (${_files.length})',
+                '첨부 파일 (\${_files.length})',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
