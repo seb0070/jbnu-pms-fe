@@ -167,6 +167,22 @@ class AuthService {
           await prefs.setString('refresh_token', data['refreshToken']);
         }
 
+        // user_id 저장
+        try {
+          final userRes = await _dio.get(
+            '/users/me',
+            options: Options(
+              headers: {'Authorization': 'Bearer ' + data['accessToken']},
+            ),
+          );
+          final userId = userRes.data['data']?['id'];
+          if (userId != null) {
+            await prefs.setInt('user_id', (userId as num).toInt());
+          }
+        } catch (e) {
+          _logger.w('user_id 저장 실패: \$e');
+        }
+
         _logger.i('로그인 성공');
         return {'success': true, 'message': '로그인 성공'};
       } else {
@@ -238,6 +254,22 @@ class AuthService {
 
         if (data['refreshToken'] != null) {
           await prefs.setString('refresh_token', data['refreshToken']);
+        }
+
+        // user_id 저장
+        try {
+          final userRes = await _dio.get(
+            '/users/me',
+            options: Options(
+              headers: {'Authorization': 'Bearer ' + data['accessToken']},
+            ),
+          );
+          final userId = userRes.data['data']?['id'];
+          if (userId != null) {
+            await prefs.setInt('user_id', (userId as num).toInt());
+          }
+        } catch (e) {
+          _logger.w('user_id 저장 실패: ' + e.toString());
         }
 
         _logger.i('구글 로그인 성공');
