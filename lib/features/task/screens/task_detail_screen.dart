@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../file/services/file_service.dart';
 import '../../../shared/widgets/download_manager.dart';
+import 'task_edit_screen.dart';
 import '../../../features/project/services/project_service.dart';
 import 'task_create_screen.dart';
 
@@ -161,9 +162,23 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 color: Color(0xFF1A1A2E),
               ),
               title: const Text('태스크 수정'),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
-                _showEditDialog();
+                final members = await _projectService.getProjectMembers(
+                  _task!['projectId'] as int,
+                );
+                if (!mounted) return;
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => TaskEditScreen(
+                      taskId: widget.taskId,
+                      task: _task!,
+                      projectMembers: members,
+                    ),
+                  ),
+                );
+                if (result == true) _loadTask();
               },
             ),
             ListTile(

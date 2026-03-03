@@ -49,11 +49,16 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
       final tasks = await _projectService.getTasks(widget.projectId);
       // 현재 유저 역할 파악
       final members = (project['members'] as List?) ?? [];
+      print('=== PROJECT ROLE DEBUG ===');
+      print('currentUserId: ' + (_currentUserId?.toString() ?? 'null'));
+      print('members: ' + members.toString());
       final myMember = members.firstWhere(
         (m) => (m['userId'] as num?)?.toInt() == _currentUserId,
         orElse: () => <String, dynamic>{},
       );
+      print('myMember: ' + myMember.toString());
       final myRole = myMember['role'] as String? ?? 'MEMBER';
+      print('myRole: ' + myRole);
 
       setState(() {
         _project = project;

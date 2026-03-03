@@ -55,8 +55,8 @@ class _ProjectCreateScreenState extends State<ProjectCreateScreen> {
         widget.spaceId,
         _nameController.text.trim(),
         _descController.text.trim(),
-        // isPublic: _isPublic,  // 백엔드 필드 추가 후 활성화
-        // dueDate: _dueDate,    // 백엔드 필드 추가 후 활성화
+        isPublic: _isPublic,
+        dueDate: _dueDate,
       );
       if (mounted) Navigator.pop(context, true);
     } catch (e) {

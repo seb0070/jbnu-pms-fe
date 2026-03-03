@@ -9,6 +9,7 @@ import '../../project/services/project_service.dart';
 import '../../project/screens/project_list_screen.dart';
 import '../../project/screens/project_create_screen.dart';
 import '../../project/screens/project_detail_screen.dart';
+import 'space_edit_screen.dart';
 
 class SpaceDetailScreen extends StatefulWidget {
   final int spaceId;
@@ -34,8 +35,21 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
   static const _lightPurple = Color(0xFFA89AF7);
   static const _inputBg = Color(0xFFF0EEFF);
 
-  bool get _isOwner =>
-      true; // TODO: user_id 연동 후 _space?['ownerId'] == _currentUserId 로 변경
+  bool get _isOwner {
+    final ownerId = (_space?['ownerId'] as num?)?.toInt();
+    return ownerId != null && ownerId == _currentUserId;
+  }
+
+  bool get _isAdmin {
+    if (_isOwner) return true;
+    final members = (_space?['members'] as List?) ?? [];
+    final me = members.firstWhere(
+      (m) => (m['userId'] as num?)?.toInt() == _currentUserId,
+      orElse: () => <String, dynamic>{},
+    );
+    final role = me['role'] as String? ?? '';
+    return role == 'ADMIN';
+  }
 
   @override
   void initState() {
@@ -557,7 +571,7 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
                         color: Color(0xFF1A1A2E),
                       ),
                     ),
-                    if (_isOwner)
+                    if (_isAdmin)
                       GestureDetector(
                         onTap: () {
                           Navigator.pop(ctx);
@@ -664,7 +678,7 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
                           color: Colors.grey,
                         ),
                       ),
-                      trailing: _isOwner && !isMe
+                      trailing: _isAdmin && !isMe && !isOwnerMember
                           ? GestureDetector(
                               onTap: () => _showMemberOptions(ctx, member),
                               child: const Icon(
@@ -713,9 +727,19 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
                   color: Color(0xFF1A1A2E),
                 ),
                 title: const Text('스페이스 수정'),
-                onTap: () {
+                onTap: () async {
                   Navigator.pop(context);
-                  _showEditDialog();
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => SpaceEditScreen(
+                        spaceId: widget.spaceId,
+                        space: _space!,
+                        currentUserId: _currentUserId ?? 0,
+                      ),
+                    ),
+                  );
+                  if (result == true) _loadData();
                 },
               ),
               ListTile(
@@ -765,7 +789,7 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            if (_isOwner)
+            if (_isAdmin)
               Expanded(
                 child: GestureDetector(
                   onTap: _showInviteDialog,

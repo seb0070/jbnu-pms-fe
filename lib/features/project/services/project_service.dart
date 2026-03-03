@@ -20,16 +20,18 @@ class ProjectService {
   Future<int> createProject(
     int spaceId,
     String name,
-    String description,
-  ) async {
+    String description, {
+    bool isPublic = true,
+    DateTime? dueDate,
+  }) async {
     final res = await _dio.post(
       '/projects',
       data: {
         'spaceId': spaceId,
         'name': name,
         'description': description,
-        // 'isPublic': isPublic,   // 백엔드 필드 추가 후 활성화
-        // 'dueDate': dueDate,     // 백엔드 필드 추가 후 활성화
+        'isPublic': isPublic,
+        if (dueDate != null) 'dueDate': dueDate.toIso8601String(),
       },
       options: await _authOptions(),
     );
@@ -98,6 +100,33 @@ class ProjectService {
   Future<void> removeAssignee(int taskId, int assigneeId) async {
     await _dio.delete(
       '/tasks/$taskId/assignees/$assigneeId',
+      options: await _authOptions(),
+    );
+  }
+
+  Future<void> inviteMember(int projectId, String email, String role) async {
+    await _dio.post(
+      '/projects/$projectId/members',
+      data: {'email': email, 'role': role},
+      options: await _authOptions(),
+    );
+  }
+
+  Future<void> updateMemberRole(
+    int projectId,
+    int targetUserId,
+    String role,
+  ) async {
+    await _dio.patch(
+      '/projects/$projectId/members/$targetUserId',
+      data: {'role': role},
+      options: await _authOptions(),
+    );
+  }
+
+  Future<void> expelMember(int projectId, int targetUserId) async {
+    await _dio.delete(
+      '/projects/$projectId/members/$targetUserId',
       options: await _authOptions(),
     );
   }
