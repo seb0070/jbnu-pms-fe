@@ -3,46 +3,38 @@ import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/network/dio_client.dart';
+import '../../../core/network/app_config.dart';
 
 class FileService {
-  final Dio _dio = Dio();
-  static const String baseUrl = 'http://10.0.2.2:8080';
+  // ✅ DioClient - baseUrl + 토큰 자동 주입
+  final Dio _dio = DioClient.create();
 
-  Future<String?> _getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('access_token');
-  }
+  // ── 다운로드 URL 헬퍼 (DownloadManager 등 외부에서 URL이 필요할 때 사용) ──
+  static String projectFileDownloadUrl(int projectId, int fileId) =>
+      '${AppConfig.baseUrl}/projects/$projectId/files/$fileId/download';
 
-  Future<Options> _authOptions() async {
-    final token = await _getToken();
-    return Options(headers: {'Authorization': 'Bearer $token'});
-  }
+  static String taskFileDownloadUrl(int taskId, int fileId) =>
+      '${AppConfig.baseUrl}/tasks/$taskId/files/$fileId/download';
 
-  // 프로젝트 파일만 조회
+  // ── 프로젝트 파일 ───────────────────────────────────────
+
   Future<List<Map<String, dynamic>>> getProjectFiles(int projectId) async {
-    final options = await _authOptions();
-    final res = await _dio.get(
-      '$baseUrl/projects/$projectId/files',
-      options: options,
-    );
+    final res = await _dio.get('/projects/$projectId/files');
     final List data = res.data['data'] ?? [];
     return data.cast<Map<String, dynamic>>();
   }
 
-  // 프로젝트 전체 파일 조회 (프로젝트 파일 + 태스크 파일)
   Future<List<Map<String, dynamic>>> getAllProjectFiles(int projectId) async {
-    final options = await _authOptions();
-    final res = await _dio.get(
-      '$baseUrl/projects/$projectId/files/all',
-      options: options,
-    );
+    final res = await _dio.get('/projects/$projectId/files/all');
     final List data = res.data['data'] ?? [];
     return data.cast<Map<String, dynamic>>();
   }
 
-  // 프로젝트 파일 업로드
   Future<void> uploadProjectFile(int projectId, File file) async {
-    final token = await _getToken();
+    // multipart: Content-Type을 직접 지정해야 하므로 Options 추가
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
     final formData = FormData.fromMap({
       'file': await MultipartFile.fromFile(
         file.path,
@@ -50,52 +42,44 @@ class FileService {
       ),
     });
     await _dio.post(
-      '$baseUrl/projects/$projectId/files',
+      '/projects/$projectId/files',
       data: formData,
       options: Options(headers: {'Authorization': 'Bearer $token'}),
     );
   }
 
-  // 프로젝트 파일 삭제
   Future<void> deleteProjectFile(int projectId, int fileId) async {
-    final options = await _authOptions();
-    await _dio.delete(
-      '$baseUrl/projects/$projectId/files/$fileId',
-      options: options,
-    );
+    await _dio.delete('/projects/$projectId/files/$fileId');
   }
 
-  // 프로젝트 파일 다운로드
   Future<void> downloadProjectFile(
     int projectId,
     int fileId,
     String fileName,
   ) async {
-    final token = await _getToken();
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
     final dir = await getApplicationDocumentsDirectory();
     final savePath = '${dir.path}/$fileName';
     await _dio.download(
-      '$baseUrl/projects/$projectId/files/$fileId/download',
+      '/projects/$projectId/files/$fileId/download',
       savePath,
       options: Options(headers: {'Authorization': 'Bearer $token'}),
     );
     await OpenFilex.open(savePath);
   }
 
-  // 태스크 파일 조회
+  // ── 태스크 파일 ─────────────────────────────────────────
+
   Future<List<Map<String, dynamic>>> getTaskFiles(int taskId) async {
-    final options = await _authOptions();
-    final res = await _dio.get(
-      '$baseUrl/tasks/$taskId/files',
-      options: options,
-    );
+    final res = await _dio.get('/tasks/$taskId/files');
     final List data = res.data['data'] ?? [];
     return data.cast<Map<String, dynamic>>();
   }
 
-  // 태스크 파일 업로드
   Future<void> uploadTaskFile(int taskId, File file) async {
-    final token = await _getToken();
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
     final formData = FormData.fromMap({
       'file': await MultipartFile.fromFile(
         file.path,
@@ -103,25 +87,23 @@ class FileService {
       ),
     });
     await _dio.post(
-      '$baseUrl/tasks/$taskId/files',
+      '/tasks/$taskId/files',
       data: formData,
       options: Options(headers: {'Authorization': 'Bearer $token'}),
     );
   }
 
-  // 태스크 파일 삭제
   Future<void> deleteTaskFile(int taskId, int fileId) async {
-    final options = await _authOptions();
-    await _dio.delete('$baseUrl/tasks/$taskId/files/$fileId', options: options);
+    await _dio.delete('/tasks/$taskId/files/$fileId');
   }
 
-  // 태스크 파일 다운로드
   Future<void> downloadTaskFile(int taskId, int fileId, String fileName) async {
-    final token = await _getToken();
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
     final dir = await getApplicationDocumentsDirectory();
     final savePath = '${dir.path}/$fileName';
     await _dio.download(
-      '$baseUrl/tasks/$taskId/files/$fileId/download',
+      '/tasks/$taskId/files/$fileId/download',
       savePath,
       options: Options(headers: {'Authorization': 'Bearer $token'}),
     );

@@ -2,6 +2,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:logger/logger.dart';
+import '../../../core/network/dio_client.dart';
 
 class AuthService {
   final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
@@ -16,52 +17,67 @@ class AuthService {
     ),
   );
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: 'http://10.0.2.2:8080', // Android 에뮬레이터용 로컬호스트
-      // baseUrl: 'http://192.168.0.1:8080', // 실제 기기 테스트용 로컬 IP
-      headers: {'Content-Type': 'application/json'},
-      connectTimeout: Duration(seconds: 10),
-      receiveTimeout: Duration(seconds: 10),
-      sendTimeout: Duration(seconds: 10),
-    ),
-  );
+  // ✅ DioClient 사용 - baseUrl, 타임아웃, 토큰 인터셉터 자동 적용
+  final Dio _dio = DioClient.create();
 
   static const String authBaseUrl = '/auth';
 
-  // 이메일 중복 확인
+  // ── 내부 헬퍼 ──────────────────────────────────────────
+
+  /// 로그인 성공 후 토큰 저장 + user_id 조회/저장
+  Future<void> _saveTokensAndUserId(Map<String, dynamic> data) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('access_token', data['accessToken']);
+    if (data['refreshToken'] != null) {
+      await prefs.setString('refresh_token', data['refreshToken']);
+    }
+
+    try {
+      // 인터셉터가 이미 토큰을 주입하지만, 여기서는 방금 받은 토큰을
+      // 명시적으로 넘겨야 prefs 저장 전 타이밍 문제가 없음
+      final userRes = await _dio.get(
+        '/users/me',
+        options: Options(
+          headers: {'Authorization': 'Bearer ${data['accessToken']}'},
+        ),
+      );
+      final userId = userRes.data['data']?['id'];
+      if (userId != null) {
+        await prefs.setInt('user_id', (userId as num).toInt());
+      }
+    } catch (e) {
+      _logger.w('user_id 저장 실패: $e');
+    }
+  }
+
+  // ── Public API ─────────────────────────────────────────
+
   Future<Map<String, dynamic>> checkEmailAvailable(String email) async {
     try {
-      _logger.d('이메일 중복 확인 시작: $email'); // <- 추가!
-
+      _logger.d('이메일 중복 확인 시작: $email');
       final response = await _dio.get(
         '$authBaseUrl/check-email',
         queryParameters: {'email': email},
       );
-
-      _logger.d('이메일 확인 응답: ${response.data}'); // <- 추가!
-
+      _logger.d('이메일 확인 응답: ${response.data}');
       return {
         'success': response.data['isSuccess'] ?? false,
         'data': response.data['data'],
       };
     } on DioException catch (e) {
-      _logger.e('이메일 확인 DioException'); // <- 추가!
-      _logger.e('상태코드: ${e.response?.statusCode}'); // <- 추가!
+      _logger.e('이메일 확인 DioException');
+      _logger.e('상태코드: ${e.response?.statusCode}');
       _logger.e('응답 데이터: ${e.response?.data}');
-
       return {
         'success': false,
         'message': e.response?.data?['message'] ?? '이메일 확인 실패',
       };
     } catch (e) {
-      // <- 추가!
       _logger.e('이메일 확인 예외: $e');
       return {'success': false, 'message': '이메일 확인 중 오류 발생'};
     }
   }
 
-  // 인증 코드 발송
   Future<Map<String, dynamic>> sendVerificationCode({
     required String email,
     required String type,
@@ -84,7 +100,6 @@ class AuthService {
     }
   }
 
-  // 인증 코드 확인
   Future<Map<String, dynamic>> verifyCode({
     required String email,
     required String code,
@@ -108,7 +123,6 @@ class AuthService {
     }
   }
 
-  // 회원가입
   Future<Map<String, dynamic>> register({
     required String name,
     required String email,
@@ -140,14 +154,12 @@ class AuthService {
     }
   }
 
-  // 일반 로그인
   Future<Map<String, dynamic>> login({
     required String email,
     required String password,
   }) async {
     try {
       _logger.d('로그인 시도: $email');
-
       final response = await _dio.post(
         '$authBaseUrl/login',
         data: {'email': email, 'password': password},
@@ -155,34 +167,11 @@ class AuthService {
 
       if (response.data['isSuccess'] == true && response.data['data'] != null) {
         final data = response.data['data'];
-
         if (data['accessToken'] == null) {
           return {'success': false, 'message': 'accessToken이 없습니다'};
         }
-
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('access_token', data['accessToken']);
-
-        if (data['refreshToken'] != null) {
-          await prefs.setString('refresh_token', data['refreshToken']);
-        }
-
-        // user_id 저장
-        try {
-          final userRes = await _dio.get(
-            '/users/me',
-            options: Options(
-              headers: {'Authorization': 'Bearer ' + data['accessToken']},
-            ),
-          );
-          final userId = userRes.data['data']?['id'];
-          if (userId != null) {
-            await prefs.setInt('user_id', (userId as num).toInt());
-          }
-        } catch (e) {
-          _logger.w('user_id 저장 실패: \$e');
-        }
-
+        // ✅ 중복 제거 - 공통 헬퍼 사용
+        await _saveTokensAndUserId(data);
         _logger.i('로그인 성공');
         return {'success': true, 'message': '로그인 성공'};
       } else {
@@ -193,15 +182,9 @@ class AuthService {
       }
     } on DioException catch (e) {
       _logger.e('로그인 실패', error: e.response?.data);
-
-      String errorMessage = '로그인 실패';
-
-      if (e.response?.data != null) {
-        if (e.response!.data is Map) {
-          errorMessage = e.response!.data['message'] ?? errorMessage;
-        }
-      }
-
+      final errorMessage = (e.response?.data is Map)
+          ? e.response!.data['message'] ?? '로그인 실패'
+          : '로그인 실패';
       return {'success': false, 'message': errorMessage};
     } catch (e) {
       _logger.e('로그인 예외', error: e);
@@ -209,11 +192,9 @@ class AuthService {
     }
   }
 
-  // 구글 로그인
   Future<Map<String, dynamic>> signInWithGoogle() async {
     try {
       _logger.d('구글 로그인 시작');
-
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
         _logger.w('구글 로그인 취소됨');
@@ -221,7 +202,6 @@ class AuthService {
       }
 
       _logger.d('구글 사용자 정보 획득: ${googleUser.email}');
-
       final googleAuth = await googleUser.authentication;
       final accessToken = googleAuth.accessToken;
 
@@ -231,7 +211,6 @@ class AuthService {
       }
 
       _logger.d('백엔드 호출 준비');
-      _logger.d('URL: ${_dio.options.baseUrl}$authBaseUrl/oauth2/login');
       _logger.d('accessToken 길이: ${accessToken.length}');
 
       final response = await _dio.post(
@@ -240,38 +219,14 @@ class AuthService {
       );
 
       _logger.d('백엔드 응답 받음: ${response.statusCode}');
-      _logger.d('응답 데이터: ${response.data}');
 
       if (response.data['isSuccess'] == true && response.data['data'] != null) {
         final data = response.data['data'];
-
         if (data['accessToken'] == null) {
           return {'success': false, 'message': 'accessToken이 없습니다'};
         }
-
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('access_token', data['accessToken']);
-
-        if (data['refreshToken'] != null) {
-          await prefs.setString('refresh_token', data['refreshToken']);
-        }
-
-        // user_id 저장
-        try {
-          final userRes = await _dio.get(
-            '/users/me',
-            options: Options(
-              headers: {'Authorization': 'Bearer ' + data['accessToken']},
-            ),
-          );
-          final userId = userRes.data['data']?['id'];
-          if (userId != null) {
-            await prefs.setInt('user_id', (userId as num).toInt());
-          }
-        } catch (e) {
-          _logger.w('user_id 저장 실패: ' + e.toString());
-        }
-
+        // ✅ 중복 제거 - 공통 헬퍼 사용
+        await _saveTokensAndUserId(data);
         _logger.i('구글 로그인 성공');
         return {'success': true, 'message': '로그인 성공'};
       } else {
@@ -281,22 +236,14 @@ class AuthService {
         };
       }
     } on DioException catch (e) {
-      _logger.e('구글 로그인 실패', error: e.response?.data);
-      _logger.e('DioException 발생!');
+      _logger.e('구글 로그인 DioException');
       _logger.e('타입: ${e.type}');
-      _logger.e('메시지: ${e.message}');
       _logger.e('URL: ${e.requestOptions.uri}');
       _logger.e('상태코드: ${e.response?.statusCode}');
       _logger.e('응답: ${e.response?.data}');
-
-      String errorMessage = '구글 로그인 실패';
-
-      if (e.response?.data != null) {
-        if (e.response!.data is Map) {
-          errorMessage = e.response!.data['message'] ?? errorMessage;
-        }
-      }
-
+      final errorMessage = (e.response?.data is Map)
+          ? e.response!.data['message'] ?? '구글 로그인 실패'
+          : '구글 로그인 실패';
       return {'success': false, 'message': errorMessage};
     } catch (e) {
       _logger.e('구글 로그인 예외', error: e);
@@ -304,20 +251,12 @@ class AuthService {
     }
   }
 
-  // 로그아웃
   Future<void> signOut() async {
     try {
-      // 1. 서버 로그아웃
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token');
-      await _dio.post(
-        '/auth/logout',
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
-      );
+      await _dio.post('/auth/logout');
     } catch (e) {
       _logger.e('서버 로그아웃 에러', error: e);
     } finally {
-      // 2. 구글 로그아웃 + 로컬 토큰 삭제
       await _googleSignIn.signOut();
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
@@ -325,7 +264,6 @@ class AuthService {
     }
   }
 
-  // 비밀번호 재설정
   Future<Map<String, dynamic>> resetPassword({
     required String email,
     required String code,
@@ -333,29 +271,20 @@ class AuthService {
   }) async {
     try {
       _logger.d('비밀번호 재설정 시도: $email');
-
       final response = await _dio.post(
         '$authBaseUrl/password/reset',
         data: {'email': email, 'code': code, 'newPassword': newPassword},
       );
-
       _logger.i('비밀번호 재설정 성공');
-
       return {
         'success': response.data['isSuccess'] ?? false,
         'message': '비밀번호가 재설정되었습니다',
       };
     } on DioException catch (e) {
       _logger.e('비밀번호 재설정 실패', error: e.response?.data);
-
-      String errorMessage = '비밀번호 재설정 실패';
-
-      if (e.response?.data != null) {
-        if (e.response!.data is Map) {
-          errorMessage = e.response!.data['message'] ?? errorMessage;
-        }
-      }
-
+      final errorMessage = (e.response?.data is Map)
+          ? e.response!.data['message'] ?? '비밀번호 재설정 실패'
+          : '비밀번호 재설정 실패';
       return {'success': false, 'message': errorMessage};
     } catch (e) {
       _logger.e('비밀번호 재설정 예외', error: e);
@@ -363,7 +292,6 @@ class AuthService {
     }
   }
 
-  // 로그인 상태 확인
   Future<bool> isLoggedIn() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -376,7 +304,6 @@ class AuthService {
     }
   }
 
-  // 저장된 토큰 가져오기
   Future<String?> getAccessToken() async {
     try {
       final prefs = await SharedPreferences.getInstance();
