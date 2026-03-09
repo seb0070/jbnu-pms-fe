@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../../../core/network/dio_client.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -21,9 +21,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
   static const _textGray = Color(0xFFAAAAAA);
   static const _dotGray = Color(0xFFCCCCCC);
 
-  final Dio _dio = Dio(BaseOptions(baseUrl: 'http://10.0.2.2:8080'));
+  // ✅ DioClient - baseUrl + 토큰 자동 주입. _getToken(), SharedPreferences 제거
+  final Dio _dio = DioClient.create();
 
-  // 날짜별 이벤트
   Map<String, List<Map<String, dynamic>>> _events = {};
   bool _isLoading = false;
 
@@ -38,22 +38,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
     _loadCalendar();
   }
 
-  Future<String?> _getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('access_token');
-  }
-
   Future<void> _loadCalendar() async {
     setState(() => _isLoading = true);
     try {
-      final token = await _getToken();
       final res = await _dio.get(
         '/calendar',
         queryParameters: {
           'year': _focusedMonth.year,
           'month': _focusedMonth.month,
         },
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
       final List items = res.data['data'] ?? [];
       final Map<String, List<Map<String, dynamic>>> events = {};
@@ -65,11 +58,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
         final key = _dateKey(date);
         events.putIfAbsent(key, () => []).add(Map<String, dynamic>.from(item));
       }
-      if (mounted)
+      if (mounted) {
         setState(() {
           _events = events;
           _isLoading = false;
         });
+      }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -132,7 +126,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
           SafeArea(
             child: Column(
               children: [
-                // 앱바
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
@@ -176,17 +169,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     ],
                   ),
                 ),
-
                 Expanded(
                   child: SingleChildScrollView(
                     child: Column(
                       children: [
-                        // 캘린더 카드
                         Container(
                           decoration: const BoxDecoration(color: Colors.white),
                           child: Column(
                             children: [
-                              // 월 헤더
                               Padding(
                                 padding: const EdgeInsets.fromLTRB(
                                   16,
@@ -248,8 +238,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                   ],
                                 ),
                               ),
-
-                              // 요일 헤더
                               Padding(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 12,
@@ -283,8 +271,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 ),
                               ),
                               const SizedBox(height: 8),
-
-                              // 날짜 그리드
                               Padding(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 12,
@@ -384,8 +370,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             ],
                           ),
                         ),
-
-                        // 이벤트 목록
                         const SizedBox(height: 16),
                         if (selectedEvents.isEmpty)
                           Padding(

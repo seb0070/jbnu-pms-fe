@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../../project/services/project_service.dart';
 
 class TaskCreateScreen extends StatefulWidget {
   final int projectId;
@@ -37,14 +36,8 @@ class _TaskCreateScreenState extends State<TaskCreateScreen> {
     {'value': 'HIGH', 'label': '높음', 'color': const Color(0xFFF95555)},
   ];
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: 'http://10.0.2.2:8080',
-      headers: {'Content-Type': 'application/json'},
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-    ),
-  );
+  // ✅ Dio, SharedPreferences 없음 - 서비스에 위임
+  final ProjectService _projectService = ProjectService();
 
   @override
   void dispose() {
@@ -74,22 +67,14 @@ class _TaskCreateScreenState extends State<TaskCreateScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token');
-
-      await _dio.post(
-        '/tasks',
-        data: {
-          'projectId': widget.projectId,
-          'title': _titleController.text.trim(),
-          'description': _descController.text.trim(),
-          'priority': _priority,
-          if (_dueDate != null) 'dueDate': _dueDate!.toIso8601String(),
-          if (widget.parentTaskId != null) 'parentId': widget.parentTaskId,
-        },
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      await _projectService.createTask(
+        projectId: widget.projectId,
+        title: _titleController.text.trim(),
+        description: _descController.text.trim(),
+        priority: _priority,
+        dueDate: _dueDate,
+        parentTaskId: widget.parentTaskId,
       );
-
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
@@ -107,18 +92,15 @@ class _TaskCreateScreenState extends State<TaskCreateScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // 배경 이미지
           Positioned.fill(
             child: Image.asset(
               'lib/assets/images/background.png',
               fit: BoxFit.cover,
             ),
           ),
-          // 콘텐츠
           SafeArea(
             child: Column(
               children: [
-                // 앱바 (배경 비침)
                 SizedBox(
                   height: 56,
                   child: Row(
@@ -146,7 +128,6 @@ class _TaskCreateScreenState extends State<TaskCreateScreen> {
                     ],
                   ),
                 ),
-                // 흰색 카드 콘텐츠
                 Expanded(
                   child: Container(
                     margin: const EdgeInsets.only(top: 8),
@@ -155,14 +136,12 @@ class _TaskCreateScreenState extends State<TaskCreateScreen> {
                       key: _formKey,
                       child: Column(
                         children: [
-                          // 스크롤 영역
                           Expanded(
                             child: SingleChildScrollView(
                               padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // 상위 태스크 표시
                                   if (widget.parentTaskId != null) ...[
                                     Container(
                                       width: double.infinity,
@@ -223,7 +202,6 @@ class _TaskCreateScreenState extends State<TaskCreateScreen> {
                                   ),
                                   const SizedBox(height: 20),
 
-                                  // 우선순위
                                   _buildLabel('우선순위'),
                                   const SizedBox(height: 8),
                                   Row(
@@ -272,7 +250,6 @@ class _TaskCreateScreenState extends State<TaskCreateScreen> {
                                   ),
                                   const SizedBox(height: 20),
 
-                                  // 마감일
                                   _buildLabel('마감일'),
                                   const SizedBox(height: 8),
                                   GestureDetector(
@@ -326,7 +303,6 @@ class _TaskCreateScreenState extends State<TaskCreateScreen> {
                                   ),
                                   const SizedBox(height: 20),
 
-                                  // 담당자
                                   _buildLabel('담당자'),
                                   const SizedBox(height: 8),
                                   Row(
@@ -404,7 +380,6 @@ class _TaskCreateScreenState extends State<TaskCreateScreen> {
                               ),
                             ),
                           ),
-                          // 하단 고정 버튼
                           Padding(
                             padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
                             child: _buildSubmitButton('작업 생성하기'),

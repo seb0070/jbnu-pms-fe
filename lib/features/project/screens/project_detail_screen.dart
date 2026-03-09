@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/network/app_config.dart';
 import '../../file/services/file_service.dart';
 import '../../../shared/widgets/download_manager.dart';
 import '../services/project_service.dart';
@@ -713,7 +714,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     final fileName = file['fileName'] as String? ?? '';
     final fileId = file['id'] as int;
     final downloadUrl =
-        'http://10.0.2.2:8080/projects/${widget.projectId}/files/$fileId/download';
+        '${AppConfig.baseUrl}/projects/${widget.projectId}/files/$fileId/download';
     DownloadManager().download(
       context: context,
       fileName: fileName,

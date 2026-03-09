@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import '../../file/services/file_service.dart';
 import '../../../shared/widgets/download_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/network/app_config.dart';
 import '../services/space_service.dart';
 import '../../project/services/project_service.dart';
 import '../../project/screens/project_list_screen.dart';
@@ -1308,10 +1309,10 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
 
     String downloadUrl;
     if (taskId != null) {
-      downloadUrl = 'http://10.0.2.2:8080/tasks/$taskId/files/$fileId/download';
+      downloadUrl = '${AppConfig.baseUrl}/tasks/$taskId/files/$fileId/download';
     } else if (projectId != null) {
       downloadUrl =
-          'http://10.0.2.2:8080/projects/$projectId/files/$fileId/download';
+          '${AppConfig.baseUrl}/projects/$projectId/files/$fileId/download';
     } else
       return;
 

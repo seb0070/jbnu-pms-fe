@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../services/space_service.dart';
 
 class SpaceCreateScreen extends StatefulWidget {
   const SpaceCreateScreen({super.key});
@@ -19,14 +18,8 @@ class _SpaceCreateScreenState extends State<SpaceCreateScreen> {
   static const _lightPurple = Color(0xFFA89AF7);
   static const _inputBg = Color(0xFFF0EEFF);
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: 'http://10.0.2.2:8080',
-      headers: {'Content-Type': 'application/json'},
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-    ),
-  );
+  // ✅ Dio, SharedPreferences 없음 - 서비스에 위임
+  final SpaceService _spaceService = SpaceService();
 
   @override
   void dispose() {
@@ -40,18 +33,10 @@ class _SpaceCreateScreenState extends State<SpaceCreateScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token');
-
-      await _dio.post(
-        '/spaces',
-        data: {
-          'name': _nameController.text.trim(),
-          'description': _descController.text.trim(),
-        },
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      await _spaceService.createSpace(
+        _nameController.text.trim(),
+        _descController.text.trim(),
       );
-
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
@@ -69,18 +54,15 @@ class _SpaceCreateScreenState extends State<SpaceCreateScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // 배경 이미지
           Positioned.fill(
             child: Image.asset(
               'lib/assets/images/background.png',
               fit: BoxFit.cover,
             ),
           ),
-          // 콘텐츠
           SafeArea(
             child: Column(
               children: [
-                // 앱바 (배경 비침)
                 SizedBox(
                   height: 56,
                   child: Row(
@@ -108,7 +90,6 @@ class _SpaceCreateScreenState extends State<SpaceCreateScreen> {
                     ],
                   ),
                 ),
-                // 흰색 카드 콘텐츠
                 Expanded(
                   child: Container(
                     margin: const EdgeInsets.only(top: 8),
@@ -117,7 +98,6 @@ class _SpaceCreateScreenState extends State<SpaceCreateScreen> {
                       key: _formKey,
                       child: Column(
                         children: [
-                          // 스크롤 영역
                           Expanded(
                             child: SingleChildScrollView(
                               padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
@@ -141,14 +121,13 @@ class _SpaceCreateScreenState extends State<SpaceCreateScreen> {
                                     controller: _descController,
                                     hint: '스페이스에 대한 설명을 입력하세요',
                                     minLines: 4,
-                                    maxLines: null, // 무제한으로 늘어남
+                                    maxLines: null,
                                   ),
                                   const SizedBox(height: 24),
                                 ],
                               ),
                             ),
                           ),
-                          // 하단 고정 버튼
                           Padding(
                             padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
                             child: _buildSubmitButton('스페이스 생성하기'),
