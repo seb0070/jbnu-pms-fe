@@ -121,6 +121,10 @@ class ProjectService {
     await _dio.delete('/projects/$projectId/members/$targetUserId');
   }
 
+  Future<void> leaveProject(int projectId) async {
+    await _dio.delete('/projects/$projectId/leave');
+  }
+
   Future<List<Map<String, dynamic>>> getProjectMembers(int projectId) async {
     final res = await _dio.get('/projects/$projectId/members');
     return List<Map<String, dynamic>>.from(res.data['data']);

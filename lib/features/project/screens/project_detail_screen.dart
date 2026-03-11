@@ -43,6 +43,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   }
 
   Future<void> _loadData() async {
+    setState(() => _isLoading = true);
     try {
       final prefs = await SharedPreferences.getInstance();
       _currentUserId = prefs.getInt('user_id');
@@ -50,16 +51,11 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
       final tasks = await _projectService.getTasks(widget.projectId);
       // 현재 유저 역할 파악
       final members = (project['members'] as List?) ?? [];
-      print('=== PROJECT ROLE DEBUG ===');
-      print('currentUserId: ' + (_currentUserId?.toString() ?? 'null'));
-      print('members: ' + members.toString());
       final myMember = members.firstWhere(
         (m) => (m['userId'] as num?)?.toInt() == _currentUserId,
         orElse: () => <String, dynamic>{},
       );
-      print('myMember: ' + myMember.toString());
       final myRole = myMember['role'] as String? ?? 'MEMBER';
-      print('myRole: ' + myRole);
 
       setState(() {
         _project = project;
@@ -203,44 +199,95 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
               ),
               onTap: () async {
                 Navigator.pop(context);
+                final projectName = _project?['name'] as String? ?? '';
                 final confirmed = await showDialog<bool>(
                   context: context,
-                  builder: (ctx) => AlertDialog(
-                    backgroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    title: const Text(
-                      '프로젝트를 삭제할까요?',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    content: const Text(
-                      '삭제된 프로젝트는 복구할 수 없어요.',
-                      style: TextStyle(fontSize: 14, color: Colors.grey),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text(
-                          '취소',
-                          style: TextStyle(color: Colors.grey),
+                  builder: (ctx) {
+                    final controller = TextEditingController();
+                    return StatefulBuilder(
+                      builder: (ctx, setState) => AlertDialog(
+                        backgroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, true),
-                        child: const Text(
-                          '삭제',
+                        title: const Text(
+                          '프로젝트 삭제',
                           style: TextStyle(
-                            color: Colors.red,
+                            fontSize: 16,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              '삭제된 프로젝트는 복구할 수 없어요.\n아래에 프로젝트 이름을 입력해주세요.',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              projectName,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF1A1A2E),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: controller,
+                              onChanged: (_) => setState(() {}),
+                              style: const TextStyle(fontSize: 14),
+                              decoration: InputDecoration(
+                                hintText: '프로젝트 이름 입력',
+                                hintStyle: TextStyle(
+                                  color: Colors.grey[400],
+                                  fontSize: 14,
+                                ),
+                                filled: true,
+                                fillColor: const Color(0xFFF7F5FF),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide.none,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 10,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text(
+                              '취소',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: controller.text == projectName
+                                ? () => Navigator.pop(ctx, true)
+                                : null,
+                            child: Text(
+                              '삭제',
+                              style: TextStyle(
+                                color: controller.text == projectName
+                                    ? Colors.red
+                                    : Colors.grey[300],
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 );
                 if (confirmed == true) {
                   try {
@@ -415,39 +462,126 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                       Expanded(
                         child: Row(
                           children: [
-                            CircleAvatar(
-                              radius: 18,
-                              backgroundColor: _lightPurple,
-                              child: const Text(
-                                '?',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
-                                Text(
-                                  '관리자',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.grey,
+                            () {
+                              final members =
+                                  (_project?['members'] as List?) ?? [];
+                              final admins = members
+                                  .where((m) => m['role'] == 'ADMIN')
+                                  .toList();
+                              if (admins.isEmpty) {
+                                return Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 18,
+                                      backgroundColor: _lightPurple,
+                                      child: const Icon(
+                                        Icons.person,
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: const [
+                                        Text(
+                                          '관리자',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                        Text(
+                                          '-',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF1A1A2E),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                );
+                              }
+                              return Row(
+                                children: [
+                                  SizedBox(
+                                    width: admins.take(3).length * 22.0 + 14,
+                                    height: 36,
+                                    child: Stack(
+                                      children: admins
+                                          .take(3)
+                                          .toList()
+                                          .asMap()
+                                          .entries
+                                          .map((e) {
+                                            final profileImage =
+                                                e.value['profileImage']
+                                                    as String?;
+                                            final name =
+                                                e.value['userName']
+                                                    as String? ??
+                                                '?';
+                                            return Positioned(
+                                              left: e.key * 16.0,
+                                              child: CircleAvatar(
+                                                radius: 18,
+                                                backgroundColor: _lightPurple,
+                                                backgroundImage:
+                                                    profileImage != null &&
+                                                        profileImage.isNotEmpty
+                                                    ? NetworkImage(profileImage)
+                                                    : null,
+                                                child:
+                                                    profileImage == null ||
+                                                        profileImage.isEmpty
+                                                    ? Text(
+                                                        name[0].toUpperCase(),
+                                                        style: const TextStyle(
+                                                          color: Colors.white,
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                          fontSize: 12,
+                                                        ),
+                                                      )
+                                                    : null,
+                                              ),
+                                            );
+                                          })
+                                          .toList(),
+                                    ),
                                   ),
-                                ),
-                                Text(
-                                  '-', // TODO: 백엔드 관리자 이름으로 교체
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF1A1A2E),
+                                  const SizedBox(width: 6),
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        '관리자',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                      Text(
+                                        admins.length == 1
+                                            ? (admins[0]['userName']
+                                                      as String? ??
+                                                  '-')
+                                            : '${admins[0]['userName']} 외 ${admins.length - 1}명',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF1A1A2E),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                              ],
-                            ),
+                                ],
+                              );
+                            }(),
                           ],
                         ),
                       ),
