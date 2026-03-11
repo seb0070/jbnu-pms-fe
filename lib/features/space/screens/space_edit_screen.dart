@@ -22,16 +22,12 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
   late final TextEditingController _descController;
   late final TextEditingController _inviteEmailController;
   bool _isSaving = false;
+  bool _hasChanges = false;
   List<Map<String, dynamic>> _members = [];
   bool _isMembersLoading = true;
 
   static const _purple = Color(0xFF6C5CE7);
   static const _inputBg = Color(0xFFF7F5FF);
-
-  bool get _isOwner {
-    final ownerId = (widget.space['ownerId'] as num?)?.toInt();
-    return ownerId == widget.currentUserId;
-  }
 
   @override
   void initState() {
@@ -110,8 +106,7 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
     final name = member['userName'] as String? ?? '';
     final role = member['role'] as String? ?? 'MEMBER';
     final isMe = userId == widget.currentUserId;
-    final isOwner = (widget.space['ownerId'] as num?)?.toInt() == userId;
-    if (isMe || isOwner) return;
+    if (isMe) return;
 
     showModalBottomSheet(
       context: context,
@@ -148,6 +143,7 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
                       userId,
                       'ADMIN',
                     );
+                    _hasChanges = true;
                     _snack('권한을 변경했어요 ✓');
                     _loadMembers();
                   } catch (e) {
@@ -167,6 +163,7 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
                       userId,
                       'MEMBER',
                     );
+                    _hasChanges = true;
                     _snack('권한을 변경했어요 ✓');
                     _loadMembers();
                   } catch (e) {
@@ -184,6 +181,7 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
                 Navigator.pop(context);
                 try {
                   await _spaceService.expelMember(widget.spaceId, userId);
+                  _hasChanges = true;
                   _snack('$name 님을 내보냈어요');
                   _loadMembers();
                 } catch (e) {
@@ -230,7 +228,7 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
                           size: 20,
                           color: Color(0xFF1A1A2E),
                         ),
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: () => Navigator.pop(context, _hasChanges),
                       ),
                       const Expanded(
                         child: Text(
@@ -253,7 +251,6 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 기본 정보
                         _buildCard(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -276,7 +273,6 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        // 멤버
                         _buildCard(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -456,53 +452,29 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
     final role = member['role'] as String? ?? 'MEMBER';
     final profileImage = member['profileImage'] as String?;
     final userId = (member['userId'] as num?)?.toInt() ?? 0;
-    final isOwner = (widget.space['ownerId'] as num?)?.toInt() == userId;
     final isMe = userId == widget.currentUserId;
-    final isAdmin = role == 'ADMIN' || isOwner;
+    final isAdmin = role == 'ADMIN';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: _purple.withOpacity(0.15),
-                backgroundImage: profileImage != null && profileImage.isNotEmpty
-                    ? NetworkImage(profileImage)
-                    : null,
-                child: profileImage == null || profileImage.isEmpty
-                    ? Text(
-                        name[0].toUpperCase(),
-                        style: const TextStyle(
-                          color: _purple,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                        ),
-                      )
-                    : null,
-              ),
-              if (isOwner)
-                Positioned(
-                  top: -3,
-                  right: -3,
-                  child: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: const BoxDecoration(
-                      color: Colors.amber,
-                      shape: BoxShape.circle,
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: _purple.withOpacity(0.15),
+            backgroundImage: profileImage != null && profileImage.isNotEmpty
+                ? NetworkImage(profileImage)
+                : null,
+            child: profileImage == null || profileImage.isEmpty
+                ? Text(
+                    name[0].toUpperCase(),
+                    style: const TextStyle(
+                      color: _purple,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
                     ),
-                    child: const Icon(
-                      Icons.star_rounded,
-                      color: Colors.white,
-                      size: 8,
-                    ),
-                  ),
-                ),
-            ],
+                  )
+                : null,
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -527,11 +499,7 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
                   ],
                 ),
                 Text(
-                  isOwner
-                      ? '소유자'
-                      : isAdmin
-                      ? '관리자'
-                      : '멤버',
+                  isAdmin ? '관리자' : '멤버',
                   style: TextStyle(fontSize: 11, color: Colors.grey[500]),
                 ),
               ],
@@ -540,31 +508,19 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: isOwner
-                  ? Colors.amber.withOpacity(0.1)
-                  : isAdmin
-                  ? _purple.withOpacity(0.1)
-                  : Colors.grey[100],
+              color: isAdmin ? _purple.withOpacity(0.1) : Colors.grey[100],
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
-              isOwner
-                  ? 'OWNER'
-                  : isAdmin
-                  ? 'ADMIN'
-                  : 'MEMBER',
+              isAdmin ? 'ADMIN' : 'MEMBER',
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
-                color: isOwner
-                    ? Colors.amber[700]
-                    : isAdmin
-                    ? _purple
-                    : Colors.grey[500],
+                color: isAdmin ? _purple : Colors.grey[500],
               ),
             ),
           ),
-          if (!isMe && !isOwner) ...[
+          if (!isMe) ...[
             const SizedBox(width: 4),
             IconButton(
               icon: const Icon(Icons.more_vert, size: 18, color: Colors.grey),

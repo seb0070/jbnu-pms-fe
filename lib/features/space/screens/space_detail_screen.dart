@@ -36,13 +36,7 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
   static const _lightPurple = Color(0xFFA89AF7);
   static const _inputBg = Color(0xFFF0EEFF);
 
-  bool get _isOwner {
-    final ownerId = (_space?['ownerId'] as num?)?.toInt();
-    return ownerId != null && ownerId == _currentUserId;
-  }
-
   bool get _isAdmin {
-    if (_isOwner) return true;
     final members = (_space?['members'] as List?) ?? [];
     final me = members.firstWhere(
       (m) => (m['userId'] as num?)?.toInt() == _currentUserId,
@@ -99,14 +93,16 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
     }
   }
 
+  // ADMIN 먼저, 그 다음 MEMBER 순으로 정렬
   List<Map<String, dynamic>> _sortedMembers() {
     final members = ((_space?['members'] as List?) ?? [])
         .map((m) => m as Map<String, dynamic>)
         .toList();
-    final ownerId = _space?['ownerId'];
     members.sort((a, b) {
-      if (a['userId'] == ownerId) return -1;
-      if (b['userId'] == ownerId) return 1;
+      final aRole = a['role'] as String? ?? 'MEMBER';
+      final bRole = b['role'] as String? ?? 'MEMBER';
+      if (aRole == 'ADMIN' && bRole != 'ADMIN') return -1;
+      if (aRole != 'ADMIN' && bRole == 'ADMIN') return 1;
       return 0;
     });
     return members;
@@ -176,50 +172,16 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
     );
   }
 
-  Future<void> _showEditDialog() async {
-    final nameController = TextEditingController(text: _space?['name']);
-    final descController = TextEditingController(
-      text: _space?['description'] ?? '',
-    );
+  Future<void> _confirmLeave() async {
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
-          '스페이스 수정',
+          '스페이스 나가기',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: InputDecoration(
-                labelText: '이름',
-                filled: true,
-                fillColor: _inputBg,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: descController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                labelText: '설명',
-                filled: true,
-                fillColor: _inputBg,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-          ],
-        ),
+        content: const Text('스페이스에서 나가시겠어요?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -228,16 +190,21 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
           TextButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              await _spaceService.updateSpace(
-                widget.spaceId,
-                nameController.text.trim(),
-                descController.text.trim(),
-              );
-              _loadData();
+              try {
+                await _spaceService.leaveSpace(widget.spaceId);
+                if (mounted) Navigator.pop(context, true);
+              } catch (e) {
+                if (mounted)
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('나가기에 실패했어요. 관리자가 1명이면 나갈 수 없어요.'),
+                    ),
+                  );
+              }
             },
             child: const Text(
-              '저장',
-              style: TextStyle(color: _purple, fontWeight: FontWeight.w600),
+              '나가기',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -276,187 +243,6 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
     );
   }
 
-  Future<void> _handleOwnerLeave() async {
-    final members = (_space?['members'] as List?) ?? [];
-    final otherMembers = members
-        .where((m) => m['userId'] != _currentUserId)
-        .toList();
-    if (otherMembers.isEmpty) {
-      await showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text(
-            '나갈 수 없어요',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-          ),
-          content: const Text('다른 멤버가 없어 나갈 수 없어요.\n스페이스를 삭제해주세요.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('확인', style: TextStyle(color: _purple)),
-            ),
-          ],
-        ),
-      );
-    } else {
-      await _showDelegateDialog(otherMembers);
-    }
-  }
-
-  Future<void> _showDelegateDialog(List otherMembers) async {
-    Map<String, dynamic>? selectedMember;
-    await showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text(
-            '권한 위임',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                '나가기 전에 ADMIN 권한을 위임할 멤버를 선택해주세요.',
-                style: TextStyle(fontSize: 13, color: Colors.grey),
-              ),
-              const SizedBox(height: 12),
-              ...otherMembers.map((m) {
-                final member = m as Map<String, dynamic>;
-                final isSelected =
-                    selectedMember?['userId'] == member['userId'];
-                return GestureDetector(
-                  onTap: () => setDialogState(() => selectedMember = member),
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? _purple.withOpacity(0.1)
-                          : const Color(0xFFF9F9F9),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isSelected ? _purple : Colors.transparent,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        _buildAvatar(member, radius: 16),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                member['userName'] ?? '',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                member['email'] ?? '',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (isSelected)
-                          const Icon(
-                            Icons.check_circle_rounded,
-                            color: _purple,
-                            size: 20,
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-              }),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('취소', style: TextStyle(color: Colors.grey)),
-            ),
-            TextButton(
-              onPressed: selectedMember == null
-                  ? null
-                  : () async {
-                      Navigator.pop(ctx);
-                      try {
-                        await _spaceService.updateMemberRole(
-                          widget.spaceId,
-                          selectedMember!['userId'],
-                          'ADMIN',
-                        );
-                        await _spaceService.leaveSpace(widget.spaceId);
-                        if (mounted) Navigator.pop(context, true);
-                      } catch (e) {
-                        if (mounted)
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('오류가 발생했어요')),
-                          );
-                      }
-                    },
-              child: Text(
-                '위임 후 나가기',
-                style: TextStyle(
-                  color: selectedMember == null ? Colors.grey : Colors.red,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _confirmLeave() async {
-    await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          '스페이스 나가기',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-        ),
-        content: const Text('스페이스에서 나가시겠어요?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('취소', style: TextStyle(color: Colors.grey)),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await _spaceService.leaveSpace(widget.spaceId);
-              if (mounted) Navigator.pop(context, true);
-            },
-            child: const Text(
-              '나가기',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showMemberOptions(BuildContext ctx, Map<String, dynamic> member) {
     showModalBottomSheet(
       context: ctx,
@@ -478,27 +264,53 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            ListTile(
-              leading: const Icon(Icons.swap_horiz, color: Color(0xFF1A1A2E)),
-              title: const Text('관리자로 변경'),
-              onTap: () async {
-                Navigator.pop(ctx);
-                Navigator.pop(ctx);
-                try {
-                  await _spaceService.updateMemberRole(
-                    widget.spaceId,
-                    member['userId'],
-                    'ADMIN',
-                  );
-                  _loadData();
-                } catch (e) {
-                  if (mounted)
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('권한 변경에 실패했어요')),
+            if (member['role'] == 'MEMBER')
+              ListTile(
+                leading: const Icon(
+                  Icons.admin_panel_settings_outlined,
+                  color: _purple,
+                ),
+                title: const Text('관리자로 변경'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  Navigator.pop(ctx);
+                  try {
+                    await _spaceService.updateMemberRole(
+                      widget.spaceId,
+                      member['userId'],
+                      'ADMIN',
                     );
-                }
-              },
-            ),
+                    _loadData();
+                  } catch (e) {
+                    if (mounted)
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('권한 변경에 실패했어요')),
+                      );
+                  }
+                },
+              ),
+            if (member['role'] == 'ADMIN')
+              ListTile(
+                leading: const Icon(Icons.person_outline, color: Colors.grey),
+                title: const Text('멤버로 변경'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  Navigator.pop(ctx);
+                  try {
+                    await _spaceService.updateMemberRole(
+                      widget.spaceId,
+                      member['userId'],
+                      'MEMBER',
+                    );
+                    _loadData();
+                  } catch (e) {
+                    if (mounted)
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('권한 변경에 실패했어요')),
+                      );
+                  }
+                },
+              ),
             ListTile(
               leading: const Icon(
                 Icons.person_remove_outlined,
@@ -542,7 +354,6 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
       ),
       builder: (ctx) {
         final members = _sortedMembers();
-        final ownerId = _space?['ownerId'];
         return DraggableScrollableSheet(
           expand: false,
           initialChildSize: 0.6,
@@ -620,37 +431,14 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
                     final member = members[index];
                     final name = member['userName'] as String? ?? '?';
                     final isMe = member['userId'] == _currentUserId;
-                    final isOwnerMember = member['userId'] == ownerId;
                     final role = member['role'] as String? ?? 'MEMBER';
+                    final isAdmin = role == 'ADMIN';
                     return ListTile(
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 20,
                         vertical: 4,
                       ),
-                      leading: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          _buildAvatar(member, radius: 22),
-                          if (isOwnerMember)
-                            Positioned(
-                              top: -4,
-                              right: -4,
-                              child: Container(
-                                width: 16,
-                                height: 16,
-                                decoration: const BoxDecoration(
-                                  color: Colors.amber,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.star_rounded,
-                                  color: Colors.white,
-                                  size: 10,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
+                      leading: _buildAvatar(member, radius: 22),
                       title: Row(
                         children: [
                           Text(
@@ -673,13 +461,13 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
                         ],
                       ),
                       subtitle: Text(
-                        role == 'ADMIN' ? '관리자' : '멤버',
+                        isAdmin ? '관리자' : '멤버',
                         style: const TextStyle(
                           fontSize: 12,
                           color: Colors.grey,
                         ),
                       ),
-                      trailing: _isAdmin && !isMe && !isOwnerMember
+                      trailing: _isAdmin && !isMe
                           ? GestureDetector(
                               onTap: () => _showMemberOptions(ctx, member),
                               child: const Icon(
@@ -721,7 +509,7 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            if (_isOwner) ...[
+            if (_isAdmin) ...[
               ListTile(
                 leading: const Icon(
                   Icons.edit_outlined,
@@ -744,14 +532,6 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.logout, color: Color(0xFF1A1A2E)),
-                title: const Text('스페이스 나가기'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _handleOwnerLeave();
-                },
-              ),
-              ListTile(
                 leading: const Icon(Icons.delete_outline, color: Colors.red),
                 title: const Text(
                   '스페이스 삭제',
@@ -762,15 +542,15 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
                   _confirmDelete();
                 },
               ),
-            ] else
-              ListTile(
-                leading: const Icon(Icons.logout, color: Color(0xFF1A1A2E)),
-                title: const Text('스페이스 나가기'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _confirmLeave();
-                },
-              ),
+            ],
+            ListTile(
+              leading: const Icon(Icons.logout, color: Color(0xFF1A1A2E)),
+              title: const Text('스페이스 나가기'),
+              onTap: () {
+                Navigator.pop(context);
+                _confirmLeave();
+              },
+            ),
             const SizedBox(height: 8),
           ],
         ),
@@ -778,12 +558,8 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
     );
   }
 
-  Widget _buildMemberGrid(List<Map<String, dynamic>> members, dynamic ownerId) {
-    final owner = members.where((m) => m['userId'] == ownerId).toList();
-    final normalMembers = members
-        .where((m) => m['userId'] != ownerId)
-        .take(4)
-        .toList();
+  Widget _buildMemberGrid(List<Map<String, dynamic>> members) {
+    final displayMembers = members.take(5).toList();
 
     return Column(
       children: [
@@ -812,17 +588,17 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
                   ),
                 ),
               ),
-            if (owner.isNotEmpty)
-              Expanded(child: _buildMemberTile(owner[0], ownerId)),
+            if (displayMembers.isNotEmpty)
+              Expanded(child: _buildMemberTile(displayMembers[0])),
           ],
         ),
-        for (int i = 0; i < normalMembers.length; i += 2) ...[
+        for (int i = 1; i < displayMembers.length; i += 2) ...[
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _buildMemberTile(normalMembers[i], ownerId)),
-              if (i + 1 < normalMembers.length)
-                Expanded(child: _buildMemberTile(normalMembers[i + 1], ownerId))
+              Expanded(child: _buildMemberTile(displayMembers[i])),
+              if (i + 1 < displayMembers.length)
+                Expanded(child: _buildMemberTile(displayMembers[i + 1]))
               else
                 const Expanded(child: SizedBox()),
             ],
@@ -832,38 +608,15 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
     );
   }
 
-  Widget _buildMemberTile(Map<String, dynamic> member, dynamic ownerId) {
+  Widget _buildMemberTile(Map<String, dynamic> member) {
     final name = member['userName'] as String? ?? '?';
     final isMe = member['userId'] == _currentUserId;
-    final isOwnerMember = member['userId'] == ownerId;
     final role = member['role'] as String? ?? 'MEMBER';
+    final isAdmin = role == 'ADMIN';
 
     return Row(
       children: [
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            _buildAvatar(member, radius: 20),
-            if (isOwnerMember)
-              Positioned(
-                top: -4,
-                right: -4,
-                child: Container(
-                  width: 14,
-                  height: 14,
-                  decoration: const BoxDecoration(
-                    color: Colors.amber,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.star_rounded,
-                    color: Colors.white,
-                    size: 9,
-                  ),
-                ),
-              ),
-          ],
-        ),
+        _buildAvatar(member, radius: 20),
         const SizedBox(width: 8),
         Expanded(
           child: Column(
@@ -890,7 +643,7 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
                 ],
               ),
               Text(
-                role == 'ADMIN' ? '관리자' : '멤버',
+                isAdmin ? '관리자' : '멤버',
                 style: const TextStyle(fontSize: 11, color: Colors.grey),
               ),
             ],
@@ -981,7 +734,6 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
 
   Widget _buildContent() {
     final members = _sortedMembers();
-    final ownerId = _space?['ownerId'];
 
     return SingleChildScrollView(
       child: Column(
@@ -1060,7 +812,7 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
                 const SizedBox(height: 12),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _buildMemberGrid(members, ownerId),
+                  child: _buildMemberGrid(members),
                 ),
                 const SizedBox(height: 28),
                 Padding(
@@ -1191,7 +943,6 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
                                       ),
                                     ),
                                   ),
-                                  // TODO: dueDate 추가되면 D-day 표시
                                   const Icon(
                                     Icons.chevron_right,
                                     color: Colors.grey,
@@ -1219,7 +970,6 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
   }
 
   Widget _buildFileSection() {
-    // 프로젝트별 그룹핑
     final Map<String, List<Map<String, dynamic>>> grouped = {};
     for (final file in _allFiles) {
       final projectName = file['projectName'] as String? ?? '알 수 없음';
@@ -1370,7 +1120,7 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    '\$uploaderName · \${_formatDate(createdAt)} · \${_formatFileSize(fileSize)}',
+                    '$uploaderName · ${_formatDate(createdAt)} · ${_formatFileSize(fileSize)}',
                     style: TextStyle(fontSize: 11, color: Colors.grey[400]),
                   ),
                 ],
@@ -1441,9 +1191,9 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
   }
 
   String _formatFileSize(int bytes) {
-    if (bytes < 1024) return '\${bytes}B';
-    if (bytes < 1024 * 1024) return '\${(bytes / 1024).toStringAsFixed(1)}KB';
-    return '\${(bytes / (1024 * 1024)).toStringAsFixed(1)}MB';
+    if (bytes < 1024) return '${bytes}B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)}KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)}MB';
   }
 
   String _formatDate(String? dateStr) {
@@ -1451,9 +1201,9 @@ class _SpaceDetailScreenState extends State<SpaceDetailScreen> {
     final date = DateTime.tryParse(dateStr);
     if (date == null) return '';
     final diff = DateTime.now().difference(date);
-    if (diff.inDays >= 7) return '\${date.month}/\${date.day}';
-    if (diff.inDays >= 1) return '\${diff.inDays}일 전';
-    if (diff.inHours >= 1) return '\${diff.inHours}시간 전';
+    if (diff.inDays >= 7) return '${date.month}/${date.day}';
+    if (diff.inDays >= 1) return '${diff.inDays}일 전';
+    if (diff.inHours >= 1) return '${diff.inHours}시간 전';
     return '방금 전';
   }
 }
