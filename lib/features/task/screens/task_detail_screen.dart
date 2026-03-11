@@ -165,18 +165,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               title: const Text('태스크 수정'),
               onTap: () async {
                 Navigator.pop(context);
-                final members = await _projectService.getProjectMembers(
-                  _task!['projectId'] as int,
-                );
                 if (!mounted) return;
                 final result = await Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => TaskEditScreen(
-                      taskId: widget.taskId,
-                      task: _task!,
-                      projectMembers: members,
-                    ),
+                    builder: (_) =>
+                        TaskEditScreen(taskId: widget.taskId, task: _task!),
                   ),
                 );
                 if (result == true) _loadTask();

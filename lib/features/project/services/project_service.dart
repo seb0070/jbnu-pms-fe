@@ -88,10 +88,14 @@ class ProjectService {
     await _dio.delete('/tasks/$taskId');
   }
 
-  Future<void> addAssignee(int taskId, int assigneeId) async {
+  Future<void> addAssignee(
+    int taskId,
+    int assigneeId, {
+    String role = 'ASSIGNEE',
+  }) async {
     await _dio.post(
       '/tasks/$taskId/assignees',
-      queryParameters: {'assigneeId': assigneeId},
+      queryParameters: {'assigneeId': assigneeId, 'role': role},
     );
   }
 
