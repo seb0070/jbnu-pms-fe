@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/project_service.dart';
+import '../../space/services/space_service.dart';
 
 class ProjectEditScreen extends StatefulWidget {
   final int projectId;
@@ -17,15 +18,16 @@ class ProjectEditScreen extends StatefulWidget {
 
 class _ProjectEditScreenState extends State<ProjectEditScreen> {
   final ProjectService _projectService = ProjectService();
+  final SpaceService _spaceService = SpaceService();
   late final TextEditingController _nameController;
   late final TextEditingController _descController;
-  late final TextEditingController _inviteEmailController;
   DateTime? _dueDate;
   String _status = 'NOT_STARTED';
   late bool _isPublic;
   bool _isSaving = false;
   bool _hasChanges = false;
   List<Map<String, dynamic>> _members = [];
+  List<Map<String, dynamic>> _spaceMembers = [];
   bool _isMembersLoading = true;
   int? _currentUserId;
   bool _isAdmin = false;
@@ -46,7 +48,6 @@ class _ProjectEditScreenState extends State<ProjectEditScreen> {
     _descController = TextEditingController(
       text: widget.project['description'] ?? '',
     );
-    _inviteEmailController = TextEditingController();
     _status = widget.project['status'] as String? ?? 'NOT_STARTED';
     final dueDateStr = widget.project['dueDate'] as String?;
     if (dueDateStr != null) _dueDate = DateTime.tryParse(dueDateStr);
@@ -58,7 +59,6 @@ class _ProjectEditScreenState extends State<ProjectEditScreen> {
   void dispose() {
     _nameController.dispose();
     _descController.dispose();
-    _inviteEmailController.dispose();
     super.dispose();
   }
 
@@ -72,8 +72,30 @@ class _ProjectEditScreenState extends State<ProjectEditScreen> {
         orElse: () => <String, dynamic>{},
       );
       final myRole = myMember['role'] as String? ?? 'MEMBER';
+
+      // 스페이스 멤버 로드 (이미 프로젝트에 있는 멤버 제외)
+      final spaceId = (widget.project['spaceId'] as num?)?.toInt();
+      List<Map<String, dynamic>> spaceMembers = [];
+      if (spaceId != null) {
+        final space = await _spaceService.getSpace(spaceId);
+        final allSpaceMembers = (space?['members'] as List? ?? [])
+            .map((m) => m as Map<String, dynamic>)
+            .toList();
+        final projectMemberIds = members
+            .map((m) => (m['userId'] as num?)?.toInt() ?? 0)
+            .toSet();
+        spaceMembers = allSpaceMembers
+            .where(
+              (m) => !projectMemberIds.contains(
+                (m['userId'] as num?)?.toInt() ?? 0,
+              ),
+            )
+            .toList();
+      }
+
       setState(() {
         _members = members;
+        _spaceMembers = spaceMembers;
         _isAdmin = myRole == 'ADMIN';
         _isMembersLoading = false;
       });
@@ -126,17 +148,90 @@ class _ProjectEditScreenState extends State<ProjectEditScreen> {
     }
   }
 
-  Future<void> _inviteMember() async {
-    final email = _inviteEmailController.text.trim();
-    if (email.isEmpty) return;
-    try {
-      await _projectService.inviteMember(widget.projectId, email, 'MEMBER');
-      _inviteEmailController.clear();
-      _snack('초대했어요 ✓');
-      _loadMembers();
-    } catch (e) {
-      _snack('초대에 실패했어요');
-    }
+  void _showInviteSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '멤버 추가',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1A1A2E),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (_spaceMembers.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(20),
+                child: Text(
+                  '추가할 수 있는 스페이스 멤버가 없어요',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              )
+            else
+              ..._spaceMembers.map((m) {
+                final uid = (m['userId'] as num?)?.toInt() ?? 0;
+                final name = m['userName'] as String? ?? '?';
+                final profileImage = m['profileImage'] as String?;
+                return ListTile(
+                  leading: _buildAvatarFromData(name, profileImage),
+                  title: Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  subtitle: Text(
+                    m['role'] == 'ADMIN' ? '관리자' : '멤버',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    try {
+                      await _projectService.inviteMember(
+                        widget.projectId,
+                        m['email'] as String? ?? '',
+                        'MEMBER',
+                      );
+                      _hasChanges = true;
+                      _snack('$name 님을 추가했어요 ✓');
+                      _loadMembers();
+                    } catch (e) {
+                      _snack('추가에 실패했어요');
+                    }
+                  },
+                );
+              }),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showMemberOptions(Map<String, dynamic> member) {
@@ -649,6 +744,26 @@ class _ProjectEditScreenState extends State<ProjectEditScreen> {
                                         color: Colors.grey[500],
                                       ),
                                     ),
+                                  if (_isAdmin) ...[
+                                    const SizedBox(width: 8),
+                                    GestureDetector(
+                                      onTap: _showInviteSheet,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: _inputBg,
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child: const Icon(
+                                          Icons.add,
+                                          size: 16,
+                                          color: _purple,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                               const SizedBox(height: 12),
@@ -661,41 +776,7 @@ class _ProjectEditScreenState extends State<ProjectEditScreen> {
                                 )
                               else
                                 ..._members.map((m) => _buildMemberTile(m)),
-                              if (_isAdmin) ...[
-                                const SizedBox(height: 16),
-                                _buildLabel('멤버 초대'),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: _buildTextField(
-                                        _inviteEmailController,
-                                        '이메일로 초대',
-                                        keyboardType:
-                                            TextInputType.emailAddress,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    GestureDetector(
-                                      onTap: _inviteMember,
-                                      child: Container(
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
-                                          color: _purple,
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                        child: const Icon(
-                                          Icons.person_add_outlined,
-                                          color: Colors.white,
-                                          size: 20,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                              if (_isAdmin) ...[const SizedBox(height: 4)],
                             ],
                           ),
                         ),
@@ -930,6 +1011,31 @@ class _ProjectEditScreenState extends State<ProjectEditScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildAvatarFromData(
+    String name,
+    String? profileImage, {
+    double radius = 18,
+  }) {
+    if (profileImage != null && profileImage.isNotEmpty) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundImage: NetworkImage(profileImage),
+      );
+    }
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: _purple.withOpacity(0.15),
+      child: Text(
+        name[0].toUpperCase(),
+        style: TextStyle(
+          color: _purple,
+          fontWeight: FontWeight.w700,
+          fontSize: radius * 0.75,
+        ),
       ),
     );
   }
