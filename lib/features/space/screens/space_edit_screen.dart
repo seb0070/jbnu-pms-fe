@@ -22,12 +22,16 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
   late final TextEditingController _descController;
   late final TextEditingController _inviteEmailController;
   bool _isSaving = false;
-  bool _hasChanges = false;
   List<Map<String, dynamic>> _members = [];
   bool _isMembersLoading = true;
 
   static const _purple = Color(0xFF6C5CE7);
   static const _inputBg = Color(0xFFF7F5FF);
+
+  bool get _isOwner {
+    final ownerId = (widget.space['ownerId'] as num?)?.toInt();
+    return ownerId == widget.currentUserId;
+  }
 
   @override
   void initState() {
@@ -106,7 +110,9 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
     final name = member['userName'] as String? ?? '';
     final role = member['role'] as String? ?? 'MEMBER';
     final isMe = userId == widget.currentUserId;
-    if (isMe) return;
+    final adminCount = _members.where((m) => m['role'] == 'ADMIN').length;
+    final isLastAdmin = role == 'ADMIN' && adminCount <= 1;
+    final isAlone = _members.length <= 1;
 
     showModalBottomSheet(
       context: context,
@@ -128,67 +134,332 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            if (role == 'MEMBER')
+
+            // 내 항목
+            if (isMe) ...[
+              if (role == 'ADMIN') ...[
+                if (isLastAdmin)
+                  ListTile(
+                    leading: Icon(
+                      Icons.person_outline,
+                      color: Colors.grey[300],
+                    ),
+                    title: Text(
+                      '멤버로 변경',
+                      style: TextStyle(color: Colors.grey[300]),
+                    ),
+                    enabled: false,
+                  )
+                else
+                  ListTile(
+                    leading: const Icon(
+                      Icons.person_outline,
+                      color: Colors.grey,
+                    ),
+                    title: const Text('멤버로 변경'),
+                    onTap: () async {
+                      try {
+                        await _spaceService.updateMemberRole(
+                          widget.spaceId,
+                          userId,
+                          'MEMBER',
+                        );
+                        if (mounted) {
+                          Navigator.pop(context); // 바텀시트
+                          Navigator.pop(context, true); // 수정화면
+                          _snack('권한을 변경했어요 ✓');
+                        }
+                      } catch (e) {
+                        _snack('권한 변경에 실패했어요');
+                      }
+                    },
+                  ),
+                if (isLastAdmin && !isAlone)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                    child: Row(
+                      children: const [
+                        Icon(Icons.info_outline, size: 14, color: Colors.grey),
+                        SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '마지막 관리자는 권한을 변경할 수 없어요',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+              ListTile(
+                leading: const Icon(Icons.exit_to_app, color: Colors.red),
+                title: const Text(
+                  '스페이스 나가기',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                onTap: () async {
+                  Navigator.pop(context);
+                  if (isAlone) {
+                    final spaceName = widget.space['name'] as String? ?? '';
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) {
+                        final controller = TextEditingController();
+                        return StatefulBuilder(
+                          builder: (ctx, setState) => AlertDialog(
+                            backgroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            title: const Text(
+                              '스페이스 나가기',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  '마지막 멤버가 나가면 스페이스가 완전히 삭제돼요.\n아래에 스페이스 이름을 입력해주세요.',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  spaceName,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF1A1A2E),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                TextField(
+                                  controller: controller,
+                                  onChanged: (_) => setState(() {}),
+                                  style: const TextStyle(fontSize: 14),
+                                  decoration: InputDecoration(
+                                    hintText: '스페이스 이름 입력',
+                                    hintStyle: TextStyle(
+                                      color: Colors.grey[400],
+                                      fontSize: 14,
+                                    ),
+                                    filled: true,
+                                    fillColor: const Color(0xFFF7F5FF),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 10,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                child: const Text(
+                                  '취소',
+                                  style: TextStyle(color: Colors.grey),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: controller.text == spaceName
+                                    ? () => Navigator.pop(ctx, true)
+                                    : null,
+                                child: Text(
+                                  '나가기',
+                                  style: TextStyle(
+                                    color: controller.text == spaceName
+                                        ? Colors.red
+                                        : Colors.grey[300],
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                    if (confirmed == true) {
+                      try {
+                        await _spaceService.deleteSpace(widget.spaceId);
+                        if (mounted) Navigator.pop(context, true);
+                      } catch (e) {
+                        _snack('나가기에 실패했어요');
+                      }
+                    }
+                  } else if (isLastAdmin) {
+                    _snack('관리자 권한을 다른 멤버에게 부여한 후 나가세요');
+                  } else {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        backgroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        title: const Text(
+                          '스페이스 나가기',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        content: const Text(
+                          '스페이스에서 나갈까요?',
+                          style: TextStyle(fontSize: 14, color: Colors.grey),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text(
+                              '취소',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text(
+                              '나가기',
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed == true) {
+                      try {
+                        await _spaceService.leaveSpace(widget.spaceId);
+                        if (mounted) Navigator.pop(context, true);
+                      } catch (e) {
+                        _snack('나가기에 실패했어요');
+                      }
+                    }
+                  }
+                },
+              ),
+            ],
+
+            // 다른 사람 항목
+            if (!isMe) ...[
+              if (role == 'MEMBER')
+                ListTile(
+                  leading: const Icon(
+                    Icons.admin_panel_settings_outlined,
+                    color: _purple,
+                  ),
+                  title: const Text('관리자로 변경'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    try {
+                      await _spaceService.updateMemberRole(
+                        widget.spaceId,
+                        userId,
+                        'ADMIN',
+                      );
+                      _snack('권한을 변경했어요 ✓');
+                      _loadMembers();
+                    } catch (e) {
+                      _snack('권한 변경에 실패했어요');
+                    }
+                  },
+                ),
+              if (role == 'ADMIN' && adminCount > 1)
+                ListTile(
+                  leading: const Icon(Icons.person_outline, color: Colors.grey),
+                  title: const Text('멤버로 변경'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    try {
+                      await _spaceService.updateMemberRole(
+                        widget.spaceId,
+                        userId,
+                        'MEMBER',
+                      );
+                      _snack('권한을 변경했어요 ✓');
+                      _loadMembers();
+                    } catch (e) {
+                      _snack('권한 변경에 실패했어요');
+                    }
+                  },
+                ),
               ListTile(
                 leading: const Icon(
-                  Icons.admin_panel_settings_outlined,
-                  color: _purple,
+                  Icons.person_remove_outlined,
+                  color: Colors.red,
                 ),
-                title: const Text('관리자로 변경'),
+                title: const Text('내보내기', style: TextStyle(color: Colors.red)),
                 onTap: () async {
                   Navigator.pop(context);
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      backgroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      title: const Text(
+                        '멤버 내보내기',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      content: Text(
+                        '$name 님을 스페이스에서 내보낼까요?',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text(
+                            '취소',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text(
+                            '내보내기',
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed != true) return;
                   try {
-                    await _spaceService.updateMemberRole(
-                      widget.spaceId,
-                      userId,
-                      'ADMIN',
-                    );
-                    _hasChanges = true;
-                    _snack('권한을 변경했어요 ✓');
+                    await _spaceService.expelMember(widget.spaceId, userId);
+                    _snack('$name 님을 내보냈어요');
                     _loadMembers();
                   } catch (e) {
-                    _snack('권한 변경에 실패했어요');
+                    _snack('내보내기에 실패했어요');
                   }
                 },
               ),
-            if (role == 'ADMIN')
-              ListTile(
-                leading: const Icon(Icons.person_outline, color: Colors.grey),
-                title: const Text('멤버로 변경'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  try {
-                    await _spaceService.updateMemberRole(
-                      widget.spaceId,
-                      userId,
-                      'MEMBER',
-                    );
-                    _hasChanges = true;
-                    _snack('권한을 변경했어요 ✓');
-                    _loadMembers();
-                  } catch (e) {
-                    _snack('권한 변경에 실패했어요');
-                  }
-                },
-              ),
-            ListTile(
-              leading: const Icon(
-                Icons.person_remove_outlined,
-                color: Colors.red,
-              ),
-              title: const Text('내보내기', style: TextStyle(color: Colors.red)),
-              onTap: () async {
-                Navigator.pop(context);
-                try {
-                  await _spaceService.expelMember(widget.spaceId, userId);
-                  _hasChanges = true;
-                  _snack('$name 님을 내보냈어요');
-                  _loadMembers();
-                } catch (e) {
-                  _snack('내보내기에 실패했어요');
-                }
-              },
-            ),
+            ],
             const SizedBox(height: 8),
           ],
         ),
@@ -228,7 +499,7 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
                           size: 20,
                           color: Color(0xFF1A1A2E),
                         ),
-                        onPressed: () => Navigator.pop(context, _hasChanges),
+                        onPressed: () => Navigator.pop(context),
                       ),
                       const Expanded(
                         child: Text(
@@ -251,6 +522,7 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // 기본 정보
                         _buildCard(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -273,6 +545,7 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
+                        // 멤버
                         _buildCard(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -452,29 +725,53 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
     final role = member['role'] as String? ?? 'MEMBER';
     final profileImage = member['profileImage'] as String?;
     final userId = (member['userId'] as num?)?.toInt() ?? 0;
+    final isOwner = (widget.space['ownerId'] as num?)?.toInt() == userId;
     final isMe = userId == widget.currentUserId;
-    final isAdmin = role == 'ADMIN';
+    final isAdmin = role == 'ADMIN' || isOwner;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: _purple.withOpacity(0.15),
-            backgroundImage: profileImage != null && profileImage.isNotEmpty
-                ? NetworkImage(profileImage)
-                : null,
-            child: profileImage == null || profileImage.isEmpty
-                ? Text(
-                    name[0].toUpperCase(),
-                    style: const TextStyle(
-                      color: _purple,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: _purple.withOpacity(0.15),
+                backgroundImage: profileImage != null && profileImage.isNotEmpty
+                    ? NetworkImage(profileImage)
+                    : null,
+                child: profileImage == null || profileImage.isEmpty
+                    ? Text(
+                        name[0].toUpperCase(),
+                        style: const TextStyle(
+                          color: _purple,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      )
+                    : null,
+              ),
+              if (isOwner)
+                Positioned(
+                  top: -3,
+                  right: -3,
+                  child: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: const BoxDecoration(
+                      color: Colors.amber,
+                      shape: BoxShape.circle,
                     ),
-                  )
-                : null,
+                    child: const Icon(
+                      Icons.star_rounded,
+                      color: Colors.white,
+                      size: 8,
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -499,7 +796,11 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
                   ],
                 ),
                 Text(
-                  isAdmin ? '관리자' : '멤버',
+                  isOwner
+                      ? '소유자'
+                      : isAdmin
+                      ? '관리자'
+                      : '멤버',
                   style: TextStyle(fontSize: 11, color: Colors.grey[500]),
                 ),
               ],
@@ -508,19 +809,31 @@ class _SpaceEditScreenState extends State<SpaceEditScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: isAdmin ? _purple.withOpacity(0.1) : Colors.grey[100],
+              color: isOwner
+                  ? Colors.amber.withOpacity(0.1)
+                  : isAdmin
+                  ? _purple.withOpacity(0.1)
+                  : Colors.grey[100],
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
-              isAdmin ? 'ADMIN' : 'MEMBER',
+              isOwner
+                  ? 'OWNER'
+                  : isAdmin
+                  ? 'ADMIN'
+                  : 'MEMBER',
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
-                color: isAdmin ? _purple : Colors.grey[500],
+                color: isOwner
+                    ? Colors.amber[700]
+                    : isAdmin
+                    ? _purple
+                    : Colors.grey[500],
               ),
             ),
           ),
-          if (!isMe) ...[
+          if (!isOwner) ...[
             const SizedBox(width: 4),
             IconButton(
               icon: const Icon(Icons.more_vert, size: 18, color: Colors.grey),
