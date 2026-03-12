@@ -194,9 +194,9 @@ class _ProjectEditScreenState extends State<ProjectEditScreen> {
               )
             else
               ..._spaceMembers.map((m) {
-                final uid = (m['userId'] as num?)?.toInt() ?? 0;
                 final name = m['userName'] as String? ?? '?';
                 final profileImage = m['profileImage'] as String?;
+                final email = m['email'] as String? ?? '';
                 return ListTile(
                   leading: _buildAvatarFromData(name, profileImage),
                   title: Text(
@@ -210,23 +210,146 @@ class _ProjectEditScreenState extends State<ProjectEditScreen> {
                     m['role'] == 'ADMIN' ? '관리자' : '멤버',
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
-                  onTap: () async {
+                  onTap: () {
                     Navigator.pop(context);
-                    try {
-                      await _projectService.inviteMember(
-                        widget.projectId,
-                        m['email'] as String? ?? '',
-                        'MEMBER',
-                      );
-                      _hasChanges = true;
-                      _snack('$name 님을 추가했어요 ✓');
-                      _loadMembers();
-                    } catch (e) {
-                      _snack('추가에 실패했어요');
-                    }
+                    _showRolePickerAndInvite(name, email);
                   },
                 );
               }),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showRolePickerAndInvite(String name, String email) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$name 님을 초대',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1A1A2E),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    '권한을 선택해주세요',
+                    style: TextStyle(fontSize: 13, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(
+                Icons.admin_panel_settings_outlined,
+                color: Color(0xFF6C5CE7),
+              ),
+              title: const Text(
+                '관리자',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: const Text(
+                '프로젝트 수정, 멤버 관리 가능',
+                style: TextStyle(fontSize: 12),
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                try {
+                  await _projectService.inviteMember(
+                    widget.projectId,
+                    email,
+                    'ADMIN',
+                  );
+                  _hasChanges = true;
+                  _snack('$name 님을 관리자로 초대했어요 ✓');
+                  _loadMembers();
+                } catch (e) {
+                  _snack('초대에 실패했어요');
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.person_outline, color: Colors.grey),
+              title: const Text(
+                '멤버',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: const Text(
+                '태스크 생성 및 수정 가능',
+                style: TextStyle(fontSize: 12),
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                try {
+                  await _projectService.inviteMember(
+                    widget.projectId,
+                    email,
+                    'MEMBER',
+                  );
+                  _hasChanges = true;
+                  _snack('$name 님을 멤버로 초대했어요 ✓');
+                  _loadMembers();
+                } catch (e) {
+                  _snack('초대에 실패했어요');
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.visibility_outlined,
+                color: Colors.blueGrey,
+              ),
+              title: const Text(
+                '뷰어',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: const Text(
+                '읽기 전용 (참관자)',
+                style: TextStyle(fontSize: 12),
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                try {
+                  await _projectService.inviteMember(
+                    widget.projectId,
+                    email,
+                    'VIEWER',
+                  );
+                  _hasChanges = true;
+                  _snack('$name 님을 뷰어로 초대했어요 ✓');
+                  _loadMembers();
+                } catch (e) {
+                  _snack('초대에 실패했어요');
+                }
+              },
+            ),
             const SizedBox(height: 8),
           ],
         ),
@@ -240,6 +363,8 @@ class _ProjectEditScreenState extends State<ProjectEditScreen> {
     final role = member['role'] as String? ?? 'MEMBER';
     final isMe = userId == _currentUserId;
     final adminCount = _members.where((m) => m['role'] == 'ADMIN').length;
+    final isLastAdmin = role == 'ADMIN' && adminCount <= 1;
+    final isAlone = _members.length <= 1;
 
     showModalBottomSheet(
       context: context,
@@ -261,112 +386,46 @@ class _ProjectEditScreenState extends State<ProjectEditScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            if (role == 'MEMBER')
-              ListTile(
-                leading: const Icon(
-                  Icons.admin_panel_settings_outlined,
-                  color: _purple,
+
+            // 내 항목
+            if (isMe) ...[
+              if (role == 'ADMIN') ...[
+                ListTile(
+                  leading: Icon(Icons.person_outline, color: Colors.grey[300]),
+                  title: Text(
+                    '멤버로 변경',
+                    style: TextStyle(color: Colors.grey[300]),
+                  ),
+                  enabled: false,
                 ),
-                title: const Text('관리자로 변경'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  try {
-                    await _projectService.updateMemberRole(
-                      widget.projectId,
-                      userId,
-                      'ADMIN',
-                    );
-                    _hasChanges = true;
-                    _snack('권한을 변경했어요 ✓');
-                    _loadMembers();
-                  } catch (e) {
-                    _snack('권한 변경에 실패했어요');
-                  }
-                },
-              ),
-            if (role == 'ADMIN' && adminCount > 1)
-              ListTile(
-                leading: const Icon(Icons.person_outline, color: Colors.grey),
-                title: const Text('멤버로 변경'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  try {
-                    await _projectService.updateMemberRole(
-                      widget.projectId,
-                      userId,
-                      'MEMBER',
-                    );
-                    _hasChanges = true;
-                    _snack('권한을 변경했어요 ✓');
-                    _loadMembers();
-                  } catch (e) {
-                    _snack('권한 변경에 실패했어요');
-                  }
-                },
-              ),
-            if (!isMe)
-              ListTile(
-                leading: const Icon(
-                  Icons.person_remove_outlined,
-                  color: Colors.red,
+                ListTile(
+                  leading: Icon(
+                    Icons.visibility_outlined,
+                    color: Colors.grey[300],
+                  ),
+                  title: Text(
+                    '뷰어로 변경',
+                    style: TextStyle(color: Colors.grey[300]),
+                  ),
+                  enabled: false,
                 ),
-                title: const Text('내보내기', style: TextStyle(color: Colors.red)),
-                onTap: () async {
-                  Navigator.pop(context);
-                  final confirmed = await showDialog<bool>(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      backgroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      title: const Text(
-                        '멤버 내보내기',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      content: Text(
-                        '$name 님을 프로젝트에서 내보낼까요?',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text(
-                            '취소',
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx, true),
-                          child: const Text(
-                            '내보내기',
-                            style: TextStyle(
-                              color: Colors.red,
-                              fontWeight: FontWeight.w700,
-                            ),
+                if (isLastAdmin && !isAlone)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                    child: Row(
+                      children: const [
+                        Icon(Icons.info_outline, size: 14, color: Colors.grey),
+                        SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '마지막 관리자는 권한을 변경할 수 없어요',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
                           ),
                         ),
                       ],
                     ),
-                  );
-                  if (confirmed != true) return;
-                  try {
-                    await _projectService.expelMember(widget.projectId, userId);
-                    _hasChanges = true;
-                    _snack('$name 님을 내보냈어요');
-                    _loadMembers();
-                  } catch (e) {
-                    _snack('내보내기에 실패했어요');
-                  }
-                },
-              ),
-            if (isMe)
+                  ),
+              ],
               ListTile(
                 leading: const Icon(Icons.exit_to_app, color: Colors.red),
                 title: const Text(
@@ -375,8 +434,7 @@ class _ProjectEditScreenState extends State<ProjectEditScreen> {
                 ),
                 onTap: () async {
                   Navigator.pop(context);
-                  // 나 혼자일 때 → 프로젝트 이름 입력 후 삭제
-                  if (_members.length <= 1) {
+                  if (isAlone) {
                     final projectName = widget.project['name'] as String? ?? '';
                     final confirmed = await showDialog<bool>(
                       context: context,
@@ -475,13 +533,9 @@ class _ProjectEditScreenState extends State<ProjectEditScreen> {
                         _snack('나가기에 실패했어요');
                       }
                     }
-                  }
-                  // 내가 마지막 관리자인데 다른 멤버 있을 때 → 토스트
-                  else if (role == 'ADMIN' && adminCount <= 1) {
+                  } else if (isLastAdmin) {
                     _snack('관리자 권한을 다른 멤버에게 부여한 후 나가세요');
-                  }
-                  // 그 외 → 정상 나가기
-                  else {
+                  } else {
                     try {
                       await _projectService.leaveProject(widget.projectId);
                       if (mounted) Navigator.pop(context, true);
@@ -491,6 +545,158 @@ class _ProjectEditScreenState extends State<ProjectEditScreen> {
                   }
                 },
               ),
+            ],
+
+            // 다른 사람 항목 (관리자만)
+            if (!isMe) ...[
+              if (role == 'MEMBER' || role == 'VIEWER')
+                ListTile(
+                  leading: const Icon(
+                    Icons.admin_panel_settings_outlined,
+                    color: _purple,
+                  ),
+                  title: const Text('관리자로 변경'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    try {
+                      await _projectService.updateMemberRole(
+                        widget.projectId,
+                        userId,
+                        'ADMIN',
+                      );
+                      _hasChanges = true;
+                      _snack('권한을 변경했어요 ✓');
+                      _loadMembers();
+                    } catch (e) {
+                      _snack('권한 변경에 실패했어요');
+                    }
+                  },
+                ),
+              if (role == 'ADMIN' && adminCount > 1)
+                ListTile(
+                  leading: const Icon(Icons.person_outline, color: Colors.grey),
+                  title: const Text('멤버로 변경'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    try {
+                      await _projectService.updateMemberRole(
+                        widget.projectId,
+                        userId,
+                        'MEMBER',
+                      );
+                      _hasChanges = true;
+                      _snack('권한을 변경했어요 ✓');
+                      _loadMembers();
+                    } catch (e) {
+                      _snack('권한 변경에 실패했어요');
+                    }
+                  },
+                ),
+              if (role == 'VIEWER')
+                ListTile(
+                  leading: const Icon(Icons.person_outline, color: Colors.grey),
+                  title: const Text('멤버로 변경'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    try {
+                      await _projectService.updateMemberRole(
+                        widget.projectId,
+                        userId,
+                        'MEMBER',
+                      );
+                      _hasChanges = true;
+                      _snack('권한을 변경했어요 ✓');
+                      _loadMembers();
+                    } catch (e) {
+                      _snack('권한 변경에 실패했어요');
+                    }
+                  },
+                ),
+              if (role == 'MEMBER')
+                ListTile(
+                  leading: const Icon(
+                    Icons.visibility_outlined,
+                    color: Colors.blueGrey,
+                  ),
+                  title: const Text('뷰어로 변경'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    try {
+                      await _projectService.updateMemberRole(
+                        widget.projectId,
+                        userId,
+                        'VIEWER',
+                      );
+                      _hasChanges = true;
+                      _snack('권한을 변경했어요 ✓');
+                      _loadMembers();
+                    } catch (e) {
+                      _snack('권한 변경에 실패했어요');
+                    }
+                  },
+                ),
+              ListTile(
+                leading: const Icon(
+                  Icons.person_remove_outlined,
+                  color: Colors.red,
+                ),
+                title: const Text('내보내기', style: TextStyle(color: Colors.red)),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      backgroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      title: const Text(
+                        '멤버 내보내기',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      content: Text(
+                        '$name 님을 프로젝트에서 내보낼까요?',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text(
+                            '취소',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text(
+                            '내보내기',
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed != true) return;
+                  try {
+                    await _projectService.expelMember(widget.projectId, userId);
+                    _hasChanges = true;
+                    _snack('$name 님을 내보냈어요');
+                    _loadMembers();
+                  } catch (e) {
+                    _snack('내보내기에 실패했어요');
+                  }
+                },
+              ),
+            ],
             const SizedBox(height: 8),
           ],
         ),
@@ -980,7 +1186,11 @@ class _ProjectEditScreenState extends State<ProjectEditScreen> {
                   ],
                 ),
                 Text(
-                  isAdmin ? '관리자' : '멤버',
+                  role == 'ADMIN'
+                      ? '관리자'
+                      : role == 'VIEWER'
+                      ? '뷰어'
+                      : '멤버',
                   style: TextStyle(fontSize: 11, color: Colors.grey[500]),
                 ),
               ],
@@ -1001,7 +1211,7 @@ class _ProjectEditScreenState extends State<ProjectEditScreen> {
               ),
             ),
           ),
-          if (_isAdmin) ...[
+          if (_isAdmin || isMe) ...[
             const SizedBox(width: 4),
             IconButton(
               icon: const Icon(Icons.more_vert, size: 18, color: Colors.grey),

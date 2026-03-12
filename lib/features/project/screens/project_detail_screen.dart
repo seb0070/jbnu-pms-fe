@@ -191,18 +191,24 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                   if (result == true) _loadData();
                 },
               ),
-            if (_isAdmin && !isAlone)
-              ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.red),
-                title: const Text(
-                  '프로젝트 삭제',
-                  style: TextStyle(
-                    color: Colors.red,
-                    fontWeight: FontWeight.w600,
-                  ),
+            // 나가기 - 모든 경우에 표시
+            ListTile(
+              leading: const Icon(Icons.exit_to_app, color: Colors.red),
+              title: const Text(
+                '프로젝트 나가기',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w600,
                 ),
-                onTap: () async {
-                  Navigator.pop(context);
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                final adminCount = members
+                    .where((m) => m['role'] == 'ADMIN')
+                    .length;
+
+                if (isAlone) {
+                  // 나 혼자 → 이름 입력 후 삭제
                   final projectName = _project?['name'] as String? ?? '';
                   final confirmed = await showDialog<bool>(
                     context: context,
@@ -215,7 +221,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                             borderRadius: BorderRadius.circular(16),
                           ),
                           title: const Text(
-                            '프로젝트 삭제',
+                            '프로젝트 나가기',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
@@ -226,7 +232,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                '삭제된 프로젝트는 복구할 수 없어요.\n아래에 프로젝트 이름을 입력해주세요.',
+                                '마지막 멤버가 나가면 프로젝트가 완전히 삭제돼요.\n아래에 프로젝트 이름을 입력해주세요.',
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: Colors.grey,
@@ -279,7 +285,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                                   ? () => Navigator.pop(ctx, true)
                                   : null,
                               child: Text(
-                                '삭제',
+                                '나가기',
                                 style: TextStyle(
                                   color: controller.text == projectName
                                       ? Colors.red
@@ -298,176 +304,64 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                       await _projectService.deleteProject(widget.projectId);
                       if (mounted) Navigator.pop(context, true);
                     } catch (e) {
-                      if (mounted) _snack('삭제에 실패했어요');
+                      if (mounted) _snack('나가기에 실패했어요');
                     }
                   }
-                },
-              ),
-            // 나 혼자이거나 멤버일 때 → 나가기
-            if (isAlone || !_isAdmin)
-              ListTile(
-                leading: const Icon(Icons.exit_to_app, color: Colors.red),
-                title: const Text(
-                  '프로젝트 나가기',
-                  style: TextStyle(
-                    color: Colors.red,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                onTap: () async {
-                  Navigator.pop(context);
-                  if (isAlone) {
-                    // 나 혼자 → 이름 입력 후 삭제
-                    final projectName = _project?['name'] as String? ?? '';
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) {
-                        final controller = TextEditingController();
-                        return StatefulBuilder(
-                          builder: (ctx, setState) => AlertDialog(
-                            backgroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            title: const Text(
-                              '프로젝트 나가기',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            content: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  '마지막 멤버가 나가면 프로젝트가 완전히 삭제돼요.\n아래에 프로젝트 이름을 입력해주세요.',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  projectName,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF1A1A2E),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                TextField(
-                                  controller: controller,
-                                  onChanged: (_) => setState(() {}),
-                                  style: const TextStyle(fontSize: 14),
-                                  decoration: InputDecoration(
-                                    hintText: '프로젝트 이름 입력',
-                                    hintStyle: TextStyle(
-                                      color: Colors.grey[400],
-                                      fontSize: 14,
-                                    ),
-                                    filled: true,
-                                    fillColor: const Color(0xFFF7F5FF),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 10,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx, false),
-                                child: const Text(
-                                  '취소',
-                                  style: TextStyle(color: Colors.grey),
-                                ),
-                              ),
-                              TextButton(
-                                onPressed: controller.text == projectName
-                                    ? () => Navigator.pop(ctx, true)
-                                    : null,
-                                child: Text(
-                                  '나가기',
-                                  style: TextStyle(
-                                    color: controller.text == projectName
-                                        ? Colors.red
-                                        : Colors.grey[300],
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    );
-                    if (confirmed == true) {
-                      try {
-                        await _projectService.deleteProject(widget.projectId);
-                        if (mounted) Navigator.pop(context, true);
-                      } catch (e) {
-                        if (mounted) _snack('나가기에 실패했어요');
-                      }
-                    }
-                  } else {
-                    // 일반 나가기
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        backgroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        title: const Text(
-                          '프로젝트 나가기',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        content: const Text(
-                          '프로젝트에서 나갈까요?',
-                          style: TextStyle(fontSize: 14, color: Colors.grey),
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx, false),
-                            child: const Text(
-                              '취소',
-                              style: TextStyle(color: Colors.grey),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx, true),
-                            child: const Text(
-                              '나가기',
-                              style: TextStyle(
-                                color: Colors.red,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
+                } else if (_isAdmin && adminCount <= 1) {
+                  // 마지막 관리자 → 토스트
+                  _snack('관리자 권한을 다른 멤버에게 부여한 후 나가세요');
+                } else {
+                  // 일반 나가기
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      backgroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                    );
-                    if (confirmed == true) {
-                      try {
-                        await _projectService.leaveProject(widget.projectId);
-                        if (mounted) Navigator.pop(context, true);
-                      } catch (e) {
-                        if (mounted) _snack('나가기에 실패했어요');
-                      }
+                      title: const Text(
+                        '프로젝트 나가기',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      content: const Text(
+                        '프로젝트에서 나갈까요?',
+                        style: TextStyle(fontSize: 14, color: Colors.grey),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text(
+                            '취소',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text(
+                            '나가기',
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed == true) {
+                    try {
+                      await _projectService.leaveProject(widget.projectId);
+                      if (mounted) Navigator.pop(context, true);
+                    } catch (e) {
+                      if (mounted) _snack('나가기에 실패했어요');
                     }
                   }
-                },
-              ),
+                }
+              },
+            ),
             const SizedBox(height: 8),
           ],
         ),
@@ -1459,7 +1353,11 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                 ],
               ),
               Text(
-                isAdmin ? '관리자' : '멤버',
+                role == 'ADMIN'
+                    ? '관리자'
+                    : role == 'VIEWER'
+                    ? '뷰어'
+                    : '멤버',
                 style: const TextStyle(fontSize: 11, color: Colors.grey),
               ),
             ],
@@ -1593,13 +1491,17 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                       ],
                     ),
                     subtitle: Text(
-                      isAdmin ? '관리자' : '멤버',
+                      role == 'ADMIN'
+                          ? '관리자'
+                          : role == 'VIEWER'
+                          ? '뷰어'
+                          : '멤버',
                       style: TextStyle(
                         fontSize: 12,
                         color: isAdmin ? _purple : Colors.grey,
                       ),
                     ),
-                    trailing: _isAdmin
+                    trailing: (_isAdmin || isMe)
                         ? GestureDetector(
                             onTap: () =>
                                 _showMemberOptionsFromSheet(ctx, m, adminCount),
@@ -1629,6 +1531,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     final name = member['userName'] as String? ?? '';
     final role = member['role'] as String? ?? 'MEMBER';
     final isMe = userId == _currentUserId;
+    final isLastAdmin = role == 'ADMIN' && adminCount <= 1;
+    final allMembers = ((_project?['members'] as List?) ?? []);
+    final isAlone = allMembers.length <= 1;
 
     showModalBottomSheet(
       context: context,
@@ -1650,50 +1555,300 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            if (role == 'MEMBER')
-              ListTile(
-                leading: const Icon(
-                  Icons.admin_panel_settings_outlined,
-                  color: _purple,
+
+            // 내 항목일 때
+            if (isMe) ...[
+              if (role == 'ADMIN') ...[
+                ListTile(
+                  leading: Icon(Icons.person_outline, color: Colors.grey[300]),
+                  title: Text(
+                    '멤버로 변경',
+                    style: TextStyle(color: Colors.grey[300]),
+                  ),
+                  enabled: false,
                 ),
-                title: const Text('관리자로 변경'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  Navigator.pop(sheetCtx);
-                  try {
-                    await _projectService.updateMemberRole(
-                      widget.projectId,
-                      userId,
-                      'ADMIN',
-                    );
-                    _snack('권한을 변경했어요 ✓');
-                    _loadData();
-                  } catch (e) {
-                    _snack('권한 변경에 실패했어요');
-                  }
-                },
-              ),
-            if (role == 'ADMIN' && adminCount > 1)
+                ListTile(
+                  leading: Icon(
+                    Icons.visibility_outlined,
+                    color: Colors.grey[300],
+                  ),
+                  title: Text(
+                    '뷰어로 변경',
+                    style: TextStyle(color: Colors.grey[300]),
+                  ),
+                  enabled: false,
+                ),
+                if (isLastAdmin && !isAlone)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                    child: Row(
+                      children: const [
+                        Icon(Icons.info_outline, size: 14, color: Colors.grey),
+                        SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '마지막 관리자는 권한을 변경할 수 없어요',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
               ListTile(
-                leading: const Icon(Icons.person_outline, color: Colors.grey),
-                title: const Text('멤버로 변경'),
+                leading: const Icon(Icons.exit_to_app, color: Colors.red),
+                title: const Text(
+                  '프로젝트 나가기',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 onTap: () async {
                   Navigator.pop(context);
                   Navigator.pop(sheetCtx);
-                  try {
-                    await _projectService.updateMemberRole(
-                      widget.projectId,
-                      userId,
-                      'MEMBER',
+                  if (isAlone) {
+                    final projectName = _project?['name'] as String? ?? '';
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) {
+                        final controller = TextEditingController();
+                        return StatefulBuilder(
+                          builder: (ctx, setState) => AlertDialog(
+                            backgroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            title: const Text(
+                              '프로젝트 나가기',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  '마지막 멤버가 나가면 프로젝트가 완전히 삭제돼요.\n아래에 프로젝트 이름을 입력해주세요.',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  projectName,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF1A1A2E),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                TextField(
+                                  controller: controller,
+                                  onChanged: (_) => setState(() {}),
+                                  style: const TextStyle(fontSize: 14),
+                                  decoration: InputDecoration(
+                                    hintText: '프로젝트 이름 입력',
+                                    hintStyle: TextStyle(
+                                      color: Colors.grey[400],
+                                      fontSize: 14,
+                                    ),
+                                    filled: true,
+                                    fillColor: const Color(0xFFF7F5FF),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 10,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                child: const Text(
+                                  '취소',
+                                  style: TextStyle(color: Colors.grey),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: controller.text == projectName
+                                    ? () => Navigator.pop(ctx, true)
+                                    : null,
+                                child: Text(
+                                  '나가기',
+                                  style: TextStyle(
+                                    color: controller.text == projectName
+                                        ? Colors.red
+                                        : Colors.grey[300],
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                     );
-                    _snack('권한을 변경했어요 ✓');
-                    _loadData();
-                  } catch (e) {
-                    _snack('권한 변경에 실패했어요');
+                    if (confirmed == true) {
+                      try {
+                        await _projectService.deleteProject(widget.projectId);
+                        if (mounted) Navigator.pop(context, true);
+                      } catch (e) {
+                        if (mounted) _snack('나가기에 실패했어요');
+                      }
+                    }
+                  } else if (isLastAdmin) {
+                    _snack('관리자 권한을 다른 멤버에게 부여한 후 나가세요');
+                  } else {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        backgroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        title: const Text(
+                          '프로젝트 나가기',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        content: const Text(
+                          '프로젝트에서 나갈까요?',
+                          style: TextStyle(fontSize: 14, color: Colors.grey),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text(
+                              '취소',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text(
+                              '나가기',
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed == true) {
+                      try {
+                        await _projectService.leaveProject(widget.projectId);
+                        if (mounted) Navigator.pop(context, true);
+                      } catch (e) {
+                        if (mounted) _snack('나가기에 실패했어요');
+                      }
+                    }
                   }
                 },
               ),
-            if (!isMe)
+            ],
+
+            // 다른 사람 항목일 때 (관리자만 볼 수 있음)
+            if (!isMe) ...[
+              if (role == 'MEMBER' || role == 'VIEWER')
+                ListTile(
+                  leading: const Icon(
+                    Icons.admin_panel_settings_outlined,
+                    color: _purple,
+                  ),
+                  title: const Text('관리자로 변경'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    Navigator.pop(sheetCtx);
+                    try {
+                      await _projectService.updateMemberRole(
+                        widget.projectId,
+                        userId,
+                        'ADMIN',
+                      );
+                      _snack('권한을 변경했어요 ✓');
+                      _loadData();
+                    } catch (e) {
+                      _snack('권한 변경에 실패했어요');
+                    }
+                  },
+                ),
+              if (role == 'ADMIN' && adminCount > 1)
+                ListTile(
+                  leading: const Icon(Icons.person_outline, color: Colors.grey),
+                  title: const Text('멤버로 변경'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    Navigator.pop(sheetCtx);
+                    try {
+                      await _projectService.updateMemberRole(
+                        widget.projectId,
+                        userId,
+                        'MEMBER',
+                      );
+                      _snack('권한을 변경했어요 ✓');
+                      _loadData();
+                    } catch (e) {
+                      _snack('권한 변경에 실패했어요');
+                    }
+                  },
+                ),
+              if (role == 'VIEWER')
+                ListTile(
+                  leading: const Icon(Icons.person_outline, color: Colors.grey),
+                  title: const Text('멤버로 변경'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    Navigator.pop(sheetCtx);
+                    try {
+                      await _projectService.updateMemberRole(
+                        widget.projectId,
+                        userId,
+                        'MEMBER',
+                      );
+                      _snack('권한을 변경했어요 ✓');
+                      _loadData();
+                    } catch (e) {
+                      _snack('권한 변경에 실패했어요');
+                    }
+                  },
+                ),
+              if (role == 'MEMBER')
+                ListTile(
+                  leading: const Icon(
+                    Icons.visibility_outlined,
+                    color: Colors.blueGrey,
+                  ),
+                  title: const Text('뷰어로 변경'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    Navigator.pop(sheetCtx);
+                    try {
+                      await _projectService.updateMemberRole(
+                        widget.projectId,
+                        userId,
+                        'VIEWER',
+                      );
+                      _snack('권한을 변경했어요 ✓');
+                      _loadData();
+                    } catch (e) {
+                      _snack('권한 변경에 실패했어요');
+                    }
+                  },
+                ),
               ListTile(
                 leading: const Icon(
                   Icons.person_remove_outlined,
@@ -1755,6 +1910,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                   }
                 },
               ),
+            ],
             const SizedBox(height: 8),
           ],
         ),
@@ -1881,24 +2037,145 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                           color: Colors.grey,
                         ),
                       ),
-                      onTap: () async {
+                      onTap: () {
                         Navigator.pop(ctx);
-                        try {
-                          await _projectService.inviteMember(
-                            widget.projectId,
-                            email,
-                            'MEMBER',
-                          );
-                          _snack('$name 님을 추가했어요 ✓');
-                          _loadData();
-                        } catch (e) {
-                          _snack('추가에 실패했어요');
-                        }
+                        _showRolePickerAndInvite(name, email);
                       },
                     );
                   },
                 ),
               ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showRolePickerAndInvite(String name, String email) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$name 님을 초대',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1A1A2E),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    '권한을 선택해주세요',
+                    style: TextStyle(fontSize: 13, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(
+                Icons.admin_panel_settings_outlined,
+                color: _purple,
+              ),
+              title: const Text(
+                '관리자',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: const Text(
+                '프로젝트 수정, 멤버 관리 가능',
+                style: TextStyle(fontSize: 12),
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                try {
+                  await _projectService.inviteMember(
+                    widget.projectId,
+                    email,
+                    'ADMIN',
+                  );
+                  _snack('$name 님을 관리자로 초대했어요 ✓');
+                  _loadData();
+                } catch (e) {
+                  _snack('초대에 실패했어요');
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.person_outline, color: Colors.grey),
+              title: const Text(
+                '멤버',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: const Text(
+                '태스크 생성 및 수정 가능',
+                style: TextStyle(fontSize: 12),
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                try {
+                  await _projectService.inviteMember(
+                    widget.projectId,
+                    email,
+                    'MEMBER',
+                  );
+                  _snack('$name 님을 멤버로 초대했어요 ✓');
+                  _loadData();
+                } catch (e) {
+                  _snack('초대에 실패했어요');
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.visibility_outlined,
+                color: Colors.blueGrey,
+              ),
+              title: const Text(
+                '뷰어',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: const Text(
+                '읽기 전용 (참관자)',
+                style: TextStyle(fontSize: 12),
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                try {
+                  await _projectService.inviteMember(
+                    widget.projectId,
+                    email,
+                    'VIEWER',
+                  );
+                  _snack('$name 님을 뷰어로 초대했어요 ✓');
+                  _loadData();
+                } catch (e) {
+                  _snack('초대에 실패했어요');
+                }
+              },
+            ),
             const SizedBox(height: 8),
           ],
         ),
